@@ -1,6 +1,7 @@
 ##############################################################################
 ###                                                                        ###
-###  Example of fitting EPP r-spline model to data from Botswana           ###
+###  Example of fitting EPP r-spline and r-trend model to data from        ###
+###  to data from Botswana.                                                ###
 ###                                                                        ###
 ###  Created on 19 June 2015 by Jeff Eaton (jeffrey.eaton@imperial.ac.uk)  ###
 ###                                                                        ###
@@ -53,23 +54,41 @@ bw.out <- prepare.epp.fit(bw.path, proj.end=2015.5)
 ####  Run EPP model  ####
 #########################
 
-## fixed parameter values
+## r-spline model: fixed parameter values
 theta.rspline <- c(2.16003605, -0.76713859, 0.21682066, 0.03286402, 0.21494412,
                    0.40138627, -0.08235464, -16.32721684, 0.21625028, -2.97511957)
 
 fp <- attr(bw.out$Urban, "eppfp")
 param <- fnCreateParam(theta.rspline, fp)
-fp.par <- update(fp, list=param)
-mod <- fnEPP(fp.par)
+fp.rspline <- update(fp, list=param)
+mod.rspline <- fnEPP(fp.rspline)
 
-round(prev(mod), 3)           # prevalence
-round(incid(mod, fp.par), 4)  # incidence
+round(prev(mod.rspline), 3)           # prevalence
+round(incid(mod.rspline, fp.rspline), 4)  # incidence
 
 likdat <- attr(bw.out$Urban, "likdat")
-qM <- qnorm(prev(mod))                                 # probit-tranformed prevalence
-log(fnANClik(qM + fp.par$ancbias, likdat$anclik.dat))  # ANC likelihood
-fnHHSll(qM, likdat$hhslik.dat)                         # survey likelihood
-ll(theta.rspline, fp.par, likdat)
+qM <- qnorm(prev(mod.rspline))                              # probit-tranformed prevalence
+log(fnANClik(qM + fp.rspline$ancbias, likdat$anclik.dat))   # ANC likelihood
+fnHHSll(qM, likdat$hhslik.dat)                              # survey likelihood
+ll(theta.rspline, fp.rspline, likdat)
+
+
+
+## r-trend model: fixed parameter values
+param.rtrend <- list(beta = c(0.46, 0.17, -0.68, -0.038),
+                     t.stabilize = 1978+20,
+                     r0 = exp(0.42))
+fp.rtrend <- update(fp, eppmod = "rtrend", iota = 0.0025, tsEpidemicStart = 1978.0,
+                    rtrend = par.rtrend, ancbias = 0.21625028)
+mod.rtrend <- fnEPP(fp.rtrend)
+
+round(prev(mod.rtrend), 3)           # prevalence
+round(incid(mod.rtrend, fp.rtrend), 4)  # incidence
+
+qM <- qnorm(prev(mod.rtrend))                             # probit-tranformed prevalence
+log(fnANClik(qM + fp.rtrend$ancbias, likdat$anclik.dat))  # ANC likelihood
+fnHHSll(qM, likdat$hhslik.dat)                             # survey likelihood
+## ll(theta.rtrend, fp.rtrend, likdat)
 
 
 #########################

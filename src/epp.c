@@ -9,14 +9,19 @@
 #define POP_50EXIT_COL  2
 #define POP_NETMIGR_COL 3
 #define POP_A50RATE_COL 4
-#define POP_MX_COL      5 
+#define POP_MX_COL      5
+
+#define EPP_RSPLINE 0
+#define EPP_RTREND 1
 
 const size_t DS = 8;  // number of disease stages (CD4 stages, including uninfected)
 const size_t TS = 4;  // number
 
 
 SEXP fnEPP(SEXP s_eppPopTS, SEXP s_projsteps, SEXP s_dt,
-	   SEXP s_rvec, SEXP s_iota, SEXP s_relinfectART, SEXP s_tsEpidemicStart,
+	   SEXP s_eppmod,
+	   SEXP s_rspline_rvec, SEXP s_iota, SEXP s_relinfectART, SEXP s_tsEpidemicStart,
+	   SEXP s_rtrend_beta, SEXP s_rtrend_tstabilize, SEXP s_rtrend_r0,
 	   SEXP s_cd4init, SEXP s_cd4prog, SEXP s_cd4artmort,
 	   SEXP s_artnumTS, SEXP s_arteligidxTS){
 
@@ -30,10 +35,21 @@ SEXP fnEPP(SEXP s_eppPopTS, SEXP s_projsteps, SEXP s_dt,
   double *age50rate_ts = REAL(VECTOR_ELT(s_eppPopTS, POP_A50RATE_COL));
   double *mx_ts = REAL(VECTOR_ELT(s_eppPopTS, POP_MX_COL));
 
-  double *rvec = REAL(s_rvec);
+  int eppmod = *INTEGER(s_eppmod);
+
   double iota = *REAL(s_iota);
   double relinfectART = *REAL(s_relinfectART);
   double tsEpidemicStart = *REAL(s_tsEpidemicStart);
+
+  double *rspline_rvec;
+  double *rtrend_beta, rtrend_tstab, rtrend_r0;
+  if(eppmod == EPP_RSPLINE)
+    rspline_rvec = REAL(s_rspline_rvec);
+  else {
+    rtrend_beta = REAL(s_rtrend_beta);
+    rtrend_tstab = *REAL(s_rtrend_tstabilize);
+    rtrend_r0 = *REAL(s_rtrend_r0);
+  }
 
   double *cd4init = REAL(s_cd4init);
   double *cd4prog = REAL(s_cd4prog);
@@ -48,14 +64,19 @@ SEXP fnEPP(SEXP s_eppPopTS, SEXP s_projsteps, SEXP s_dt,
   
   // initialise output
   size_t numOutDates = ceil(dt * nsteps), outIdx = 0;
-  SEXP s_Xout, s_Xout_dim;
+  SEXP s_Xout, s_Xout_dim, s_rvec; 
   PROTECT(s_Xout = allocVector(REALSXP, numOutDates * DS * TS));
   PROTECT(s_Xout_dim = allocVector(INTSXP, 3));
   INTEGER(s_Xout_dim)[0] = numOutDates;
   INTEGER(s_Xout_dim)[1] = DS;
   INTEGER(s_Xout_dim)[2] = TS;
   setAttrib(s_Xout, R_DimSymbol, s_Xout_dim);
+
+  PROTECT(s_rvec = allocVector(REALSXP, nsteps));
+  setAttrib(s_Xout, install("rvec"), s_rvec);
+
   double *Xout = REAL(s_Xout);
+  double *rvec = REAL(s_rvec);
 
 
   // initialise population
@@ -64,6 +85,8 @@ SEXP fnEPP(SEXP s_eppPopTS, SEXP s_projsteps, SEXP s_dt,
     for(size_t u = 0; u < TS; u++)
       X[m][u] = 0.0;
   X[0][0] = pop15to49_ts[0];
+
+  double prevlast = 0.0; // store last prevalence value for r-trend
 
   // do timesteps
   for(size_t ts = 0; ts < nsteps; ts++){
@@ -84,6 +107,21 @@ SEXP fnEPP(SEXP s_eppPopTS, SEXP s_projsteps, SEXP s_dt,
 	Xonart += X[m][u];
     }
     double Xtot = X[0][0] + Xhivp_noart + Xonart;
+    double prevcurr = 1.0 - X[0][0] / Xtot;
+
+    // calculate r(t)
+    if(eppmod == EPP_RSPLINE)
+      rvec[ts] = rspline_rvec[ts];
+    else {
+      double t = projsteps[ts];
+      if(t > tsEpidemicStart){
+	double gamma_t = (t < rtrend_tstab)?0.0:(prevcurr-prevlast) * (t - rtrend_tstab) / (dt * prevlast);
+	double logr_diff = rtrend_beta[1]*(rtrend_beta[0] - rvec[ts-1]) + rtrend_beta[2]*prevlast + rtrend_beta[3]*gamma_t;
+	rvec[ts] = exp(log(rvec[ts-1]) + logr_diff);
+      } else {
+	rvec[ts] = rtrend_r0;
+      }
+    }
     
     // ageing, natural mortality, and net migration
     double grad[DS][TS];
@@ -146,6 +184,9 @@ SEXP fnEPP(SEXP s_eppPopTS, SEXP s_projsteps, SEXP s_dt,
 	grad[m][1] += artstageinit[m];
       }
     }
+
+    // store prevalence to use in next time step
+    prevlast = prevcurr;
       
     // do projection (euler integration)
     for(size_t m = 0; m < DS; m++)
@@ -154,7 +195,7 @@ SEXP fnEPP(SEXP s_eppPopTS, SEXP s_projsteps, SEXP s_dt,
     
   }
 
-  UNPROTECT(2);
+  UNPROTECT(3);
 
   return s_Xout;
 }
