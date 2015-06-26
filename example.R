@@ -50,6 +50,29 @@ bw.out <- prepare.epp.fit(bw.path, proj.end=2015.5)
 
 
 #########################
+####  Run EPP model  ####
+#########################
+
+## fixed parameter values
+theta.rspline <- c(2.16003605, -0.76713859, 0.21682066, 0.03286402, 0.21494412,
+                   0.40138627, -0.08235464, -16.32721684, 0.21625028, -2.97511957)
+
+fp <- attr(bw.out$Urban, "eppfp")
+param <- fnCreateParam(theta.rspline, fp)
+fp.par <- update(fp, list=param)
+mod <- fnEPP(fp.par)
+
+round(prev(mod), 3)           # prevalence
+round(incid(mod, fp.par), 4)  # incidence
+
+likdat <- attr(bw.out$Urban, "likdat")
+qM <- qnorm(prev(mod))                                 # probit-tranformed prevalence
+log(fnANClik(qM + fp.par$ancbias, likdat$anclik.dat))  # ANC likelihood
+fnHHSll(qM, likdat$hhslik.dat)                         # survey likelihood
+ll(theta.rspline, fp.par, likdat)
+
+
+#########################
 ####  Fit EPP model  ####
 #########################
 
@@ -71,6 +94,9 @@ fit.mod <- function(obj, ..., B0 = 1e5, B = 1e4, B.re = 3000, number_k = 500){
   
 bw.out$Urban <- fit.mod(bw.out$Urban, equil.rprior=TRUE, B0=1e4, B=1e3)
 bw.out$Rural <- fit.mod(bw.out$Rural, equil.rprior=TRUE, B0=1e4, B=1e3)
+## Note: This crashes if there are fewer than two parameter combinations
+##       with non-zero likelihood. In this case run again with different
+##       seed, or larger B0.
 
 
 ######################################
