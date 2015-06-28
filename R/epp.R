@@ -106,7 +106,8 @@ fnCreateEPPFixPar <- function(epp.input,
               cd4artmort      = cd4artmort,
               relinfectART    = relinfectART,
               numKnots        = numKnots,
-              rvec.spldes     = rvec.spldes)
+              rvec.spldes     = rvec.spldes,
+              iota            = 0.0025)
 
   class(val) <- "eppfp"
   return(val)
@@ -132,21 +133,27 @@ TS <- 4   # ART treatment duration stages
 
 fnEPP <- function(fp, VERSION = "C"){
 
-
+  if(!exists("eppmod", where=fp))
+    fp$eppmod <- "rspline" # if missing assume r-spline (backward compatibility)
+  
   if(VERSION != "R"){
+    eppmodInt <- as.integer(fp$eppmod == "rtrend") # 0: r-spline; 1: r-trend
     mod <- .Call("fnEPP", fp$epp.pop.ts, fp$proj.steps, fp$dt,
+                 eppmodInt,
                  fp$rvec, fp$iota, fp$relinfectART, as.numeric(fp$tsEpidemicStart),
+                 fp$rtrend$beta, fp$rtrend$tStabilize, fp$rtrend$r0,
                  fp$cd4init, fp$cd4prog, fp$cd4artmort,
                  fp$artnum.ts, as.integer(fp$artelig.idx.ts))
     class(mod) <- "epp"
     return(mod)
   }
 
-##################################################################################
+  ##################################################################################
 
   proj.steps <- fp$proj.steps
   epp.pop.ts <- fp$epp.pop.ts
   dt <- fp$dt
+  rvec <- if(fp$eppmod == "rtrend") rep(NA, length(proj.steps)) else fp$rvec
 
   ## initialize output
   Xout <- array(NA, c(sum(fp$proj.steps %% 1 == dt*floor((1/dt)/2)), DS, TS))
@@ -155,12 +162,20 @@ fnEPP <- function(fp, VERSION = "C"){
   X <- array(0, c(DS, TS))
   X[1,1] <- epp.pop.ts$pop15to49[1]
 
+  ## store last prevalence value (for r-trend model)
+  prevlast <- prevcurr<- 0
 
   for(ts in 1:length(proj.steps)){
-
+    
     if(proj.steps[ts] %% 1 == dt*floor((1/dt)/2)) # store the result mid-year (or ts before mid-year)
       Xout[ceiling(ts*dt),,] <- X
+    
+    ## calculate r(t)
+    prevcurr <- 1.0-sum(X[1,])/sum(X)
+    if(fp$eppmod=="rtrend")
+      rvec[ts] <- calc.rt(proj.steps[ts], fp, rvec[ts-1L], prevlast, prevcurr)
 
+    ## initialize gradient
     grad <- array(0, c(DS, TS))
 
     ## ageing and natural mortality
@@ -173,7 +188,7 @@ fnEPP <- function(fp, VERSION = "C"){
     incr(grad) <- X/sum(X) * epp.pop.ts$netmigr[ts] / dt
 
     ## new infections
-    incrate <- fp$rvec[ts] * (sum(X[-1,1]) + fp$relinfectART * sum(X[-1,-1])) / sum(X) + fp$iota*(proj.steps[ts] == fp$tsEpidemicStart)
+    incrate <- rvec[ts] * (sum(X[-1,1]) + fp$relinfectART * sum(X[-1,-1])) / sum(X) + fp$iota*(proj.steps[ts] == fp$tsEpidemicStart)
     incr(grad[1,1]) <- -X[1,1] * incrate
     incr(grad[-1,1]) <- X[1,1] * incrate * fp$cd4init
 
@@ -200,13 +215,27 @@ fnEPP <- function(fp, VERSION = "C"){
       incr(grad[fp$artelig.idx.ts[ts]:DS, 2]) <- artinit.ann.ts
     }
 
+    ## store prevalence to use in next time step
+    prevlast <- prevcurr
+
     ## do projection (euler integration) ##
     incr(X) <- dt*grad
 
   } # for(ts in proj.steps)
 
   class(Xout) <- "epp"
+  attr(Xout, "rvec") <- rvec
   return(Xout)
+}
+
+calc.rt <- function(t, fp, rveclast, prevlast, prevcurr){
+  if(t > fp$tsEpidemicStart){
+    par <- fp$rtrend
+    gamma.t <- if(t < par$tStabilize) 0 else (prevcurr-prevlast)*(t - par$tStabilize) / (fp$dt*prevlast)
+    logr.diff <- par$beta[2]*(par$beta[1] - rveclast) + par$beta[3]*prevlast + par$beta[4]*gamma.t
+      return(exp(log(rveclast) + logr.diff))
+    } else
+      return(fp$rtrend$r0)
 }
 
 prev.epp <- function(mod){
@@ -234,7 +263,7 @@ update.eppfp <- function(fp, ..., keep.attr=TRUE, list=vector("list")){
       attr <- attributes(fp[[newnames[j]]])
     fp[[newnames[j]]]<-eval(dots[[j]],fp, parent.frame())
     if(keep.attr)
-      attributes(fp[[newnames[j]]]) <- attr
+      attributes(fp[[newnames[j]]]) <- c(attr, attributes(fp[[newnames[j]]]))
   }
 
   listnames <- names(list)
@@ -243,7 +272,7 @@ update.eppfp <- function(fp, ..., keep.attr=TRUE, list=vector("list")){
       attr <- attributes(fp[[listnames[j]]])
     fp[[listnames[j]]]<-eval(list[[j]],fp, parent.frame())
     if(keep.attr)
-      attributes(fp[[listnames[j]]]) <- attr
+      attributes(fp[[listnames[j]]]) <- c(attr, attributes(fp[[listnames[j]]]))
   }
   
   return(fp)
@@ -255,7 +284,7 @@ update.eppfp <- function(fp, ..., keep.attr=TRUE, list=vector("list")){
 #########################
 
 incid.epp <- function(mod, fp){
-  fp$rvec[fp$proj.steps %% 1 == 0.5] * (rowSums(mod[,-1,1]) + fp$relinfectART * rowSums(mod[,-1,-1])) / rowSums(mod)
+  attr(mod, "rvec")[fp$proj.steps %% 1 == 0.5] * (rowSums(mod[,-1,1]) + fp$relinfectART * rowSums(mod[,-1,-1])) / rowSums(mod)
 }
 
 fnARTCov <- function(mod){
