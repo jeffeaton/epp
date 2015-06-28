@@ -106,7 +106,8 @@ fnCreateEPPFixPar <- function(epp.input,
               cd4artmort      = cd4artmort,
               relinfectART    = relinfectART,
               numKnots        = numKnots,
-              rvec.spldes     = rvec.spldes)
+              rvec.spldes     = rvec.spldes,
+              iota            = 0.0025)
 
   class(val) <- "eppfp"
   return(val)
@@ -140,7 +141,7 @@ fnEPP <- function(fp, VERSION = "C"){
     mod <- .Call("fnEPP", fp$epp.pop.ts, fp$proj.steps, fp$dt,
                  eppmodInt,
                  fp$rvec, fp$iota, fp$relinfectART, as.numeric(fp$tsEpidemicStart),
-                 fp$rtrend$beta, fp$rtrend$t.stabilize, fp$rtrend$r0,
+                 fp$rtrend$beta, fp$rtrend$tStabilize, fp$rtrend$r0,
                  fp$cd4init, fp$cd4prog, fp$cd4artmort,
                  fp$artnum.ts, as.integer(fp$artelig.idx.ts))
     class(mod) <- "epp"
@@ -230,7 +231,7 @@ fnEPP <- function(fp, VERSION = "C"){
 calc.rt <- function(t, fp, rveclast, prevlast, prevcurr){
   if(t > fp$tsEpidemicStart){
     par <- fp$rtrend
-    gamma.t <- if(t < par$t.stabilize) 0 else (prevcurr-prevlast)*(t - par$t.stabilize) / (fp$dt*prevlast)
+    gamma.t <- if(t < par$tStabilize) 0 else (prevcurr-prevlast)*(t - par$tStabilize) / (fp$dt*prevlast)
     logr.diff <- par$beta[2]*(par$beta[1] - rveclast) + par$beta[3]*prevlast + par$beta[4]*gamma.t
       return(exp(log(rveclast) + logr.diff))
     } else

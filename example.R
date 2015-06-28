@@ -63,7 +63,7 @@ param <- fnCreateParam(theta.rspline, fp)
 fp.rspline <- update(fp, list=param)
 mod.rspline <- fnEPP(fp.rspline)
 
-round(prev(mod.rspline), 3)           # prevalence
+round(prev(mod.rspline), 3)               # prevalence
 round(incid(mod.rspline, fp.rspline), 4)  # incidence
 
 likdat <- attr(bw.out$Urban, "likdat")
@@ -73,22 +73,21 @@ fnHHSll(qM, likdat$hhslik.dat)                              # survey likelihood
 ll(theta.rspline, fp.rspline, likdat)
 
 
-
 ## r-trend model: fixed parameter values
-param.rtrend <- list(beta = c(0.46, 0.17, -0.68, -0.038),
-                     t.stabilize = 1978+20,
-                     r0 = exp(0.42))
-fp.rtrend <- update(fp, eppmod = "rtrend", iota = 0.0025, tsEpidemicStart = 1978.0,
-                    rtrend = par.rtrend, ancbias = 0.21625028)
+fp <- update(attr(bw.out$Urban, "eppfp"), eppmod = "rtrend", iota = 0.0025)
+theta.rtrend <- c(1978, 20, 0.42, 0.46, 0.17, -0.68, -0.038, 0.21625028)
+
+param.rtrend <- fnCreateParam(theta.rtrend, fp)
+fp.rtrend <- update(fp, list=param.rtrend)
 mod.rtrend <- fnEPP(fp.rtrend)
 
-round(prev(mod.rtrend), 3)           # prevalence
+round(prev(mod.rtrend), 3)              # prevalence
 round(incid(mod.rtrend, fp.rtrend), 4)  # incidence
 
 qM <- qnorm(prev(mod.rtrend))                             # probit-tranformed prevalence
 log(fnANClik(qM + fp.rtrend$ancbias, likdat$anclik.dat))  # ANC likelihood
 fnHHSll(qM, likdat$hhslik.dat)                             # survey likelihood
-## ll(theta.rtrend, fp.rtrend, likdat)
+ll(theta.rtrend, fp.rtrend, likdat)
 
 
 #########################
@@ -110,12 +109,21 @@ fit.mod <- function(obj, ..., B0 = 1e5, B = 1e4, B.re = 3000, number_k = 500){
 
   return(fit)
 }
-  
-bw.out$Urban <- fit.mod(bw.out$Urban, equil.rprior=TRUE, B0=1e4, B=1e3)
-bw.out$Rural <- fit.mod(bw.out$Rural, equil.rprior=TRUE, B0=1e4, B=1e3)
+
+
 ## Note: This crashes if there are fewer than two parameter combinations
 ##       with non-zero likelihood. In this case run again with different
 ##       seed, or larger B0.
+
+bw.rspline <- list()
+bw.rspline$Urban <- fit.mod(bw.out$Urban, equil.rprior=TRUE, B0=1e4, B=1e3)
+bw.rspline$Rural <- fit.mod(bw.out$Rural, equil.rprior=TRUE, B0=1e4, B=1e3)
+
+bw.rtrend <- list()
+bw.rtrend$Urban <- fit.mod(bw.out$Urban, eppmod="rtrend", iota=0.0025, B0=1e4, B=1e3)
+bw.rtrend$Rural <- fit.mod(bw.out$Rural, eppmod="rtrend", iota=0.0025, B0=1e4, B=1e3)
+
+save(bw.rspline, bw.rtrend, file="bw-example-fit.RData")
 
 
 ######################################
@@ -132,8 +140,11 @@ sim.mod <- function(fit){
   return(fit)
 }
 
-bw.out$Urban <- sim.mod(bw.out$Urban)
-bw.out$Rural <- sim.mod(bw.out$Rural)
+bw.rspline$Urban <- sim.mod(bw.rspline$Urban)
+bw.rspline$Rural <- sim.mod(bw.rspline$Rural)
+
+bw.rtrend$Urban <- sim.mod(bw.rtrend$Urban)
+bw.rtrend$Rural <- sim.mod(bw.rtrend$Rural)
 
 
 ## Plot prevalence, incidence, r(t)
@@ -165,47 +176,86 @@ plot.incid <- function(fit, ylim=c(0, 0.05), col="blue"){
 }
 
 plot.rvec <- function(fit, ylim=c(0, 3), col="blue"){
-  rvec <- sapply(fit$param, "[[", "rvec")
-  plot(fit$fp$proj.steps, rowMeans(rvec), type="n", ylim=ylim, ylab="", yaxt="n")
+  rvec <- lapply(fit$mod, attr, "rvec")
+  rvec <- mapply(function(rv, par){replace(rv, fit$fp$proj.steps < par$tsEpidemicStart, NA)},
+                 rvec, fit$param)
+  plot(fit$fp$proj.steps, rowMeans(rvec, na.rm=TRUE), type="n", ylim=ylim, ylab="", yaxt="n")
   axis(2, labels=FALSE)
-  cred.region(fit$fp$proj.steps, apply(rvec, 1, quantile, c(0.025, 0.975)), col=transp(col, 0.3))
-  lines(fit$fp$proj.steps, rowMeans(rvec), col=col)
+  cred.region(fit$fp$proj.steps, apply(rvec, 1, quantile, c(0.025, 0.975), na.rm=TRUE), col=transp(col, 0.3))
+  lines(fit$fp$proj.steps, rowMeans(rvec, na.rm=TRUE), col=col)
 }
 
-
-
+## Plot Botswana Urban
 quartz(h=3.6, w=6, pointsize=8)
 
 par(mfrow=c(2,3), tcl=-0.25, mgp=c(2, 0.5, 0), mar=c(2, 3.5, 2, 1), las=1, cex=1.0)
 ##
-plot.prev(bw.out$Urban, col="darkred", ylim=c(0, 0.3))
+plot.prev(bw.rspline$Urban, col="darkred", ylim=c(0, 0.3))
 axis(2, tick="no")
 axis(1, tick="no")
 mtext("prevalence", 2, 2.5, las=3)
-mtext("Botswana Urban", line=0.5, adj=-1, font=2, cex=1.2)
+mtext("Botswana Urban: r-spline", line=0.5, at=1955, adj=0, font=2, cex=1.2)
 ##
-plot.incid(bw.out$Urban, col="darkred", ylim=c(0, 0.06))
+plot.incid(bw.rspline$Urban, col="darkred", ylim=c(0, 0.06))
 axis(2, tick="no")
 axis(1, tick="no")
 mtext("incidence", 2, 2.5, las=3)
 ##
-plot.rvec(bw.out$Urban, col="darkred")
+plot.rvec(bw.rspline$Urban, col="darkred")
 axis(2, tick="no")
 axis(1, tick="no")
 mtext("r(t)", 2, 2.5, las=3)
 ####
-plot.prev(bw.out$Rural, col="darkolivegreen", ylim=c(0, 0.3))
+plot.prev(bw.rtrend$Urban, col="darkolivegreen", ylim=c(0, 0.3))
 axis(2, tick="no")
 axis(1, tick="no")
 mtext("prevalence", 2, 2.5, las=3)
-mtext("Botswana Rural", line=0.5, adj=-1, font=2, cex=1.2)
+mtext("Botswana Urban: r-trend", line=0.5, at=1955, adj=0, font=2, cex=1.2)
 ##
-plot.incid(bw.out$Rural, col="darkolivegreen", ylim=c(0, 0.06))
+plot.incid(bw.rtrend$Urban, col="darkolivegreen", ylim=c(0, 0.06))
 axis(2, tick="no")
 axis(1, tick="no")
 mtext("incidence", 2, 2.5, las=3)
 ##
-plot.rvec(bw.out$Rural, col="darkolivegreen")
+plot.rvec(bw.rtrend$Urban, col="darkolivegreen")
+axis(2, tick="no")
+axis(1, tick="no")
+mtext("r(t)", 2, 2.5, las=3)
+
+
+## Plot Botswana Rural
+quartz(h=3.6, w=6, pointsize=8)
+
+par(mfrow=c(2,3), tcl=-0.25, mgp=c(2, 0.5, 0), mar=c(2, 3.5, 2, 1), las=1, cex=1.0)
+##
+plot.prev(bw.rspline$Rural, col="darkred", ylim=c(0, 0.3))
+axis(2, tick="no")
+axis(1, tick="no")
+mtext("prevalence", 2, 2.5, las=3)
+mtext("Botswana Rural: r-spline", line=0.5, at=1955, adj=0, font=2, cex=1.2)
+##
+plot.incid(bw.rspline$Rural, col="darkred", ylim=c(0, 0.06))
+axis(2, tick="no")
+axis(1, tick="no")
+mtext("incidence", 2, 2.5, las=3)
+##
+plot.rvec(bw.rspline$Rural, col="darkred")
+axis(2, tick="no")
+axis(1, tick="no")
+mtext("r(t)", 2, 2.5, las=3)
+####
+plot.prev(bw.rtrend$Rural, col="darkolivegreen", ylim=c(0, 0.3))
+axis(2, tick="no")
+axis(1, tick="no")
+mtext("prevalence", 2, 2.5, las=3)
+mtext("Botswana Rural: r-trend", line=0.5, at=1955, adj=0, font=2, cex=1.2)
+##
+plot.incid(bw.rtrend$Rural, col="darkolivegreen", ylim=c(0, 0.06))
+axis(2, tick="no")
+axis(1, tick="no")
+mtext("incidence", 2, 2.5, las=3)
+##
+plot.rvec(bw.rtrend$Rural, col="darkolivegreen")
 axis(2, tick="no")
 axis(1, tick="no")
 mtext("r(t)", 2, 2.5, las=3)
@@ -242,37 +292,49 @@ pred.quantile <- function(fit){
 }
 
 ## Sample site-level random effects
-bw.out$Urban <- add.b.site(bw.out$Urban)
-bw.out$Rural <- add.b.site(bw.out$Rural)
+bw.rspline$Urban <- add.b.site(bw.rspline$Urban)
+bw.rspline$Rural <- add.b.site(bw.rspline$Rural)
+bw.rtrend$Urban <- add.b.site(bw.rtrend$Urban)
+bw.rtrend$Rural <- add.b.site(bw.rtrend$Rural)
 
 ## Sample from clinic posterior predictive distribution
-bw.out$Urban <- add.pred.site(bw.out$Urban)
-bw.out$Rural <- add.pred.site(bw.out$Rural)
+bw.rspline$Urban <- add.pred.site(bw.rspline$Urban)
+bw.rspline$Rural <- add.pred.site(bw.rspline$Rural)
+bw.rtrend$Urban <- add.pred.site(bw.rtrend$Urban)
+bw.rtrend$Rural <- add.pred.site(bw.rtrend$Rural)
 
 ## In-sample coverage of 95% prediction interval
-pred.coverage(bw.out$Urban)
-pred.coverage(bw.out$Rural)
+pred.coverage(bw.rspline$Urban)
+pred.coverage(bw.rspline$Rural)
+pred.coverage(bw.rtrend$Urban)
+pred.coverage(bw.rtrend$Rural)
 
 ## Q-Q plot of predicted vs. theoretical quantiles for ANC prevalence
-bw.out$Urban <- pred.quantile(bw.out$Urban)
-bw.out$Rural <- pred.quantile(bw.out$Rural)
+bw.rspline$Urban <- pred.quantile(bw.rspline$Urban)
+bw.rspline$Rural <- pred.quantile(bw.rspline$Rural)
+bw.rtrend$Urban <- pred.quantile(bw.rtrend$Urban)
+bw.rtrend$Rural <- pred.quantile(bw.rtrend$Rural)
 
 quartz(w=6, h=3, pointsize=9)
 
 par(mfrow=c(1,2), tcl=-0.25, mgp=c(2, 0.5, 0), mar=c(3, 3, 2.5, 1), las=1, cex=1.0)
 ##
-plot(seq(0, 1, length.out=length(unlist(bw.out$Urban$pred.quant))),
-     sort(unlist(bw.out$Urban$pred.quant)),
-     pch=20, cex=0.5,
+matplot(seq(0, 1, length.out=length(unlist(bw.rspline$Urban$pred.quant))),
+     cbind(sort(unlist(bw.rspline$Urban$pred.quant)),
+           sort(unlist(bw.rtrend$Urban$pred.quant))),
+     pch=20, cex=0.5, col=c("darkred", "darkolivegreen"),
      main="Botswana Urban",
      xlab="Theoretical quantiles",
      ylab="Observed quantiles")
 abline(a=0, b=1)
+legend("topleft", c("r-spline", "r-trend"), pch=20, pt.cex=0.5, col=c("darkred", "darkolivegreen"))
 ##
-plot(seq(0, 1, length.out=length(unlist(bw.out$Rural$pred.quant))),
-     sort(unlist(bw.out$Rural$pred.quant)),
-     pch=20, cex=0.5,
+matplot(seq(0, 1, length.out=length(unlist(bw.rspline$Rural$pred.quant))),
+        cbind(sort(unlist(bw.rspline$Rural$pred.quant)),
+              sort(unlist(bw.rtrend$Rural$pred.quant))),
+     pch=20, cex=0.5, col=c("darkred", "darkolivegreen"),
      main="Botswana Rural",
      xlab="Theoretical quantiles",
      ylab="Observed quantiles")
 abline(a=0, b=1)
+legend("topleft", c("r-spline", "r-trend"), pch=20, pt.cex=0.5, col=c("darkred", "darkolivegreen"))
