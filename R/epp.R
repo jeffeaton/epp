@@ -10,7 +10,7 @@ fnCreateEPPSubpops <- function(epp.input, epp.subpops, epp.data){
   ## If no HH survey, apportion based on relative mean ANC prevalence
   subpop.dist <- prop.table(sapply(epp.subpops$subpops, "[[", "pop15to49")[epp.subpops$total$year == 2010,])  # population distribution in 2010
   if(nrow(subset(epp.data[[1]]$hhs, used)) != 0){ # HH survey data available
-    hhsprev.means <- sapply(lapply(epp.data, function(dat) dat$hhs$prev[dat$hhs$used]), mean)
+    hhsprev.means <- sapply(lapply(epp.data, function(dat) na.omit(dat$hhs$prev[dat$hhs$used])), mean)
     art.dist <- prop.table(subpop.dist * hhsprev.means)
   } else {  ## no HH survey data
     ## Apportion ART according to relative average ANC prevalence in each subpopulation
