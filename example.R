@@ -34,7 +34,7 @@ prepare.epp.fit <- function(filepath, proj.end=2015.5){
     mapply(function(set, value){ attributes(set)[[attrib]] <- value; set}, obj, value.lst)
 
   val <- set.list.attr(val, "eppd", eppd)
-  val <- set.list.attr(val, "likdat", lapply(eppd, fnCreateLikDat))
+  val <- set.list.attr(val, "likdat", lapply(eppd, fnCreateLikDat, anchor.year=epp.input$start.year))
   val <- set.list.attr(val, "eppfp", lapply(epp.subp.input, fnCreateEPPFixPar, proj.end = proj.end))
   val <- set.list.attr(val, "country", attr(eppd, "country"))
   val <- set.list.attr(val, "region", names(eppd))
@@ -123,7 +123,7 @@ bw.rtrend <- list()
 bw.rtrend$Urban <- fit.mod(bw.out$Urban, eppmod="rtrend", iota=0.0025, B0=1e4, B=1e3)
 bw.rtrend$Rural <- fit.mod(bw.out$Rural, eppmod="rtrend", iota=0.0025, B0=1e4, B=1e3)
 
-save(bw.rspline, bw.rtrend, file="bw-example-fit.RData")
+save(bw.out, bw.rspline, bw.rtrend, file="bw-example-fit.RData")
 
 
 ######################################
