@@ -10,8 +10,7 @@
 setwd("~/Documents/Code/R/epp/")
 
 source("~/Documents/Code/R/read-epp-spectrum/read-epp-files.R")  # https://github.com/jeffeaton/read-epp-spectrum
-source("R/epp.R")
-source("R/likelihood.R")
+library(epp)
 
 
 ## Function to do the following:

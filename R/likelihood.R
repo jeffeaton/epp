@@ -1,15 +1,7 @@
+## source("R/epp.R")
+## source("R/generics.R")
 
-dir <- getwd()
-## setwd("~/anclik/")
-setwd("~/Documents/Code/R/anclik/")
-source("anclik.R")
-setwd(dir)
-rm(dir)
-
-source("R/epp.R")
-source("R/generics.R")
-
-source("R/IMIS.R")
+## source("R/IMIS.R")
 
 
 #################
@@ -90,7 +82,7 @@ fnHHSll <- function(qM, hhslik.dat){
 
 fnCreateLikDat <- function(epp.data, anchor.year=1970L){
 
-  likdat <- list(anclik.dat = fnPrepareANCLikelihoodData(epp.data$anc.prev, epp.data$anc.n, , anchor.year=anchor.year),
+  likdat <- list(anclik.dat = anclik::fnPrepareANCLikelihoodData(epp.data$anc.prev, epp.data$anc.n, , anchor.year=anchor.year),
                  hhslik.dat = fnPrepareHHSLikData(epp.data$hhs, anchor.year=anchor.year))
   likdat$lastdata.idx <- max(unlist(likdat$anclik.dat$anc.idx.lst), likdat$hhslik.dat$idx)
   likdat$firstdata.idx <- min(unlist(likdat$anclik.dat$anc.idx.lst), likdat$hhslik.dat$idx)
@@ -139,7 +131,7 @@ ll <- function(theta, fp, likdat){
   if(any(is.na(qM.all)) || any(qM.all[likdat$firstdata.idx:likdat$lastdata.idx] == -Inf))
     return(-Inf)
 
-  ll.anc <- log(fnANClik(qM.preg+fp$ancbias, likdat$anclik.dat))
+  ll.anc <- log(anclik::fnANClik(qM.preg+fp$ancbias, likdat$anclik.dat))
   ll.hhs <- fnHHSll(qM.all, likdat$hhslik.dat)
 
   if(exists("equil.rprior", where=fp) && fp$equil.rprior){

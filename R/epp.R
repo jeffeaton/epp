@@ -1,5 +1,3 @@
-library(splines)
-
 fnCreateEPPSubpops <- function(epp.input, epp.subpops, epp.data){
 
   ## Raise a warning if sum of subpops is more than 1% different from total population
@@ -93,7 +91,7 @@ fnCreateEPPFixPar <- function(epp.input,
   numKnots <- 7
   proj.dur <- diff(range(proj.steps))
   rvec.knots <- seq(min(proj.steps) - 3*proj.dur/(numKnots-3), max(proj.steps) + 3*proj.dur/(numKnots-3), proj.dur/(numKnots-3))
-  rvec.spldes <- splineDesign(rvec.knots, proj.steps)
+  rvec.spldes <- splines::splineDesign(rvec.knots, proj.steps)
 
   val <- list(proj.steps      = proj.steps,
               tsEpidemicStart = tsEpidemicStart,
@@ -122,9 +120,6 @@ fnCreateEPPFixPar <- function(epp.input,
 ####  EPP model  ####
 #####################
 
-
-dyn.load(paste("src/epp", .Platform$dynlib.ext, sep=""))  # Load C version
-
 "incr<-" <- function(x, value) { x + value } # increment operator, from Hmisc
 
 DS <- 8   # number of disease stages
@@ -143,7 +138,7 @@ fnEPP <- function(fp, VERSION = "C"){
                  fp$rvec, fp$iota, fp$relinfectART, as.numeric(fp$tsEpidemicStart),
                  fp$rtrend$beta, fp$rtrend$tStabilize, fp$rtrend$r0,
                  fp$cd4init, fp$cd4prog, fp$cd4artmort,
-                 fp$artnum.ts, as.integer(fp$artelig.idx.ts))
+                 fp$artnum.ts, as.integer(fp$artelig.idx.ts), PACKAGE="epp")
     class(mod) <- "epp"
     return(mod)
   }

@@ -3,7 +3,6 @@
 
 #include <math.h>
 
-
 #define POP_15TO49_COL  0
 #define POP_15ENTER_COL 1
 #define POP_50EXIT_COL  2
@@ -57,6 +56,8 @@ SEXP fnEPP(SEXP s_eppPopTS, SEXP s_projsteps, SEXP s_dt,
   for(size_t m = 0; m < DS-1; m++)
     for(size_t u = 0; u < TS; u++)
       cd4artmort[m][u] = REAL(s_cd4artmort)[m + (DS-1)*u];
+
+  // array cd4artmort_alt = {2, INTEGER(getAttrib(s_cd4artmort, R_DimSymbol)), REAL(s_cd4artmort)};
 
   double *artnum_ts = REAL(s_artnumTS);
   int *arteligidx_ts = INTEGER(s_arteligidxTS);

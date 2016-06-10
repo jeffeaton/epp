@@ -1,5 +1,5 @@
 
-Implementation of the EPP r-spline model for HIV epidemic estimates.
+Implementation of the EPP r-spline and r-trend model for HIV epidemic estimates.
 
 Some key references:
 - Stover et al. Sex Transm Infect 2012. (http://sti.bmj.com/content/88/Suppl_2/i11)
@@ -12,7 +12,5 @@ This project also relies on other projects:
 
 - https://github.com/jeffeaton/read-epp-spectrum
 - https://github.com/jeffeaton/anclik
-
-
 
 Created on 19 June 2015 by Jeff Eaton <jeffrey.eaton@imperial.ac.uk>
