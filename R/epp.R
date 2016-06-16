@@ -126,19 +126,19 @@ DS <- 8   # number of disease stages
 TS <- 4   # ART treatment duration stages
 
 
-fnEPP <- function(fp, VERSION = "C"){
+simmod.eppfp <- function(fp, VERSION = "C"){
 
   if(!exists("eppmod", where=fp))
     fp$eppmod <- "rspline" # if missing assume r-spline (backward compatibility)
   
   if(VERSION != "R"){
     eppmodInt <- as.integer(fp$eppmod == "rtrend") # 0: r-spline; 1: r-trend
-    mod <- .Call("fnEPP", fp$epp.pop.ts, fp$proj.steps, fp$dt,
+    mod <- .Call(eppC, fp$epp.pop.ts, fp$proj.steps, fp$dt,
                  eppmodInt,
                  fp$rvec, fp$iota, fp$relinfectART, as.numeric(fp$tsEpidemicStart),
                  fp$rtrend$beta, fp$rtrend$tStabilize, fp$rtrend$r0,
                  fp$cd4init, fp$cd4prog, fp$cd4artmort,
-                 fp$artnum.ts, as.integer(fp$artelig.idx.ts), PACKAGE="epp")
+                 fp$artnum.ts, as.integer(fp$artelig.idx.ts))
     class(mod) <- "epp"
     return(mod)
   }

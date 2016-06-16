@@ -17,7 +17,7 @@ const size_t DS = 8;  // number of disease stages (CD4 stages, including uninfec
 const size_t TS = 4;  // number
 
 
-SEXP fnEPP(SEXP s_eppPopTS, SEXP s_projsteps, SEXP s_dt,
+SEXP eppC(SEXP s_eppPopTS, SEXP s_projsteps, SEXP s_dt,
 	   SEXP s_eppmod,
 	   SEXP s_rspline_rvec, SEXP s_iota, SEXP s_relinfectART, SEXP s_tsEpidemicStart,
 	   SEXP s_rtrend_beta, SEXP s_rtrend_tstabilize, SEXP s_rtrend_r0,

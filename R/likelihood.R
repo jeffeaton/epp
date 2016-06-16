@@ -123,7 +123,7 @@ ll <- function(theta, fp, likdat){
     if(min(fp$rvec)<0 || max(fp$rvec)>20) # Test positivity of rvec
       return(-Inf)
   
-  mod <- fnEPP(fp)
+  mod <- simmod(fp)
 
   qM.all <- qnorm(prev(mod))
   qM.preg <- if(exists("pregprev", where=fp) && fp$pregprev) qnorm(fnPregPrev(mod, fp)) else qM.all

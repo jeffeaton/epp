@@ -60,14 +60,14 @@ theta.rspline <- c(2.16003605, -0.76713859, 0.21682066, 0.03286402, 0.21494412,
 fp <- attr(bw.out$Urban, "eppfp")
 param <- fnCreateParam(theta.rspline, fp)
 fp.rspline <- update(fp, list=param)
-mod.rspline <- fnEPP(fp.rspline)
+mod.rspline <- simmod(fp.rspline)
 
 round(prev(mod.rspline), 3)               # prevalence
 round(incid(mod.rspline, fp.rspline), 4)  # incidence
 
 likdat <- attr(bw.out$Urban, "likdat")
 qM <- qnorm(prev(mod.rspline))                              # probit-tranformed prevalence
-log(fnANClik(qM + fp.rspline$ancbias, likdat$anclik.dat))   # ANC likelihood
+log(anclik::fnANClik(qM + fp.rspline$ancbias, likdat$anclik.dat))   # ANC likelihood
 fnHHSll(qM, likdat$hhslik.dat)                              # survey likelihood
 ll(theta.rspline, fp.rspline, likdat)
 
@@ -78,13 +78,13 @@ theta.rtrend <- c(1978, 20, 0.42, 0.46, 0.17, -0.68, -0.038, 0.21625028)
 
 param.rtrend <- fnCreateParam(theta.rtrend, fp)
 fp.rtrend <- update(fp, list=param.rtrend)
-mod.rtrend <- fnEPP(fp.rtrend)
+mod.rtrend <- simmod(fp.rtrend)
 
 round(prev(mod.rtrend), 3)              # prevalence
 round(incid(mod.rtrend, fp.rtrend), 4)  # incidence
 
 qM <- qnorm(prev(mod.rtrend))                             # probit-tranformed prevalence
-log(fnANClik(qM + fp.rtrend$ancbias, likdat$anclik.dat))  # ANC likelihood
+log(anclik::fnANClik(qM + fp.rtrend$ancbias, likdat$anclik.dat))  # ANC likelihood
 fnHHSll(qM, likdat$hhslik.dat)                             # survey likelihood
 ll(theta.rtrend, fp.rtrend, likdat)
 
@@ -133,7 +133,7 @@ save(bw.out, bw.rspline, bw.rtrend, file="bw-example-fit.RData")
 sim.mod <- function(fit){
   fit$param <- lapply(seq_len(nrow(fit$resample)), function(ii) fnCreateParam(fit$resample[ii,], fit$fp))
   fp.list <- lapply(fit$param, function(par) update(fit$fp, list=par))
-  fit$mod <- lapply(fp.list, fnEPP)
+  fit$mod <- lapply(fp.list, simmod)
   fit$prev <- sapply(fit$mod, prev)
   fit$incid <- mapply(incid, mod = fit$mod, fp = fp.list)
   return(fit)
