@@ -42,7 +42,7 @@ lprior <- function(theta, fp){
     return(sum(dnorm(theta[3:nk], 0, sqrt(tau2), log=TRUE)) +
            dunif(theta[nk+1], logiota.unif.prior[1], logiota.unif.prior[2], log=TRUE) + 
            dnorm(theta[nk+2], ancbias.pr.mean, ancbias.pr.sd, log=TRUE) +
-           ldinvgamma(tau2, invGammaParameter, invGammaParameter))
+           ldinvgamma(tau2, invGammaParameter, invGammaParameter) + log(tau2))  # + log(tau2): multiply likelihood by jacobian of exponential transformation
   } else { # rtrend
 
     return(dunif(theta[1], t0.unif.prior[1], t0.unif.prior[2], log=TRUE) +
