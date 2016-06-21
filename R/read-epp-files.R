@@ -8,10 +8,14 @@ read_epp_input <- function(ep.path){
   ## ep1
   ep1 <- scan(paste(ep.path, ".ep1", sep=""), "character", sep="\n")
 
+  country.idx <- which(sapply(ep1, substr, 1, 7) == "COUNTRY")
   firstprojyr.idx <-  which(sapply(ep1, substr, 1, 11) == "FIRSTPROJYR")
   lastprojyr.idx <-  which(sapply(ep1, substr, 1, 10) == "LASTPROJYR")
   popstart.idx <- which(ep1 == "POPSTART")+1
   popend.idx <- which(ep1 == "POPEND")-1
+
+  country <- as.character(read.csv(text=ep1[country.idx], header=FALSE, as.is=TRUE)[2])
+  country.code <- as.integer(read.csv(text=ep1[country.idx], header=FALSE)[3])
 
   start.year <- as.integer(read.csv(text=ep1[firstprojyr.idx], header=FALSE)[2])
   stop.year <- as.integer(read.csv(text=ep1[lastprojyr.idx], header=FALSE)[2])
@@ -57,6 +61,8 @@ read_epp_input <- function(ep.path){
                 infectreduc      = infectreduc,
                 epp.art          = epp.art)
   class(eppin) <- "eppin"
+  attr(eppin, "country") <- country
+  attr(eppin, "country.code") <- country.code
 
   return(eppin)
 }

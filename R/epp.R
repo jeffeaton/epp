@@ -40,7 +40,8 @@ fnCreateEPPFixPar <- function(epp.input,
                               proj.end = epp.input$stop.year+dt*ceiling(1/(2*dt)),
                               tsEpidemicStart = proj.start,
                               cd4stage.weights=c(1.3, 0.6, 0.1, 0.1, 0.0, 0.0, 0.0),
-                              art1yr.weight = 0.1){
+                              art1yr.weight = 0.1,
+                              ancadj=TRUE, ancadj.yr=2015){
 
   #########################
   ##  Population inputs  ##
@@ -93,6 +94,26 @@ fnCreateEPPFixPar <- function(epp.input,
   rvec.knots <- seq(min(proj.steps) - 3*proj.dur/(numKnots-3), max(proj.steps) + 3*proj.dur/(numKnots-3), proj.dur/(numKnots-3))
   rvec.spldes <- splines::splineDesign(rvec.knots, proj.steps)
 
+  #################################
+  ##  ANC prevalence adjustment  ##
+  #################################
+
+  if(ancadj.yr==2016){
+    ancadj.db <- read.csv(system.file("extdata", "AdultToPWDB_2016.csv", package="epp"))
+  } else if(ancadj.yr==2015){
+    ancadj.db <- read.csv(system.file("extdata", "AdultToPWDB.csv", package="epp"))
+  }
+  
+  out.steps <- proj.steps[proj.steps %% 1 == dt*floor((1/dt)/2)]
+  ancadj.dat <- ancadj.db[ancadj.db[,1] == attr(epp.input, "country"), paste0("X", 1985:2020)]  
+  if(nrow(ancadj.dat) == 0){
+    warning(paste(attr(epp.input, "country"), "not found in", ancadj.yr, "ANC adjustment database. Using median trend."), call.=FALSE)
+    ancadj.dat <- ancadj.db[ancadj.db[,1] == "Median", paste0("X", 1985:2020)]
+  }
+  ancadjrr <- approx(1985:2020+0.5, ancadj.dat, out.steps, rule=2)$y # take first if multiple for a country
+  ## !!! NOTE: UPDATE TO HANDLE SUBNATIONAL REGIONS
+
+
   val <- list(proj.steps      = proj.steps,
               tsEpidemicStart = tsEpidemicStart,
               dt              = dt,
@@ -105,7 +126,9 @@ fnCreateEPPFixPar <- function(epp.input,
               relinfectART    = relinfectART,
               numKnots        = numKnots,
               rvec.spldes     = rvec.spldes,
-              iota            = 0.0025)
+              iota            = 0.0025,
+              ancadj          = ancadj,
+              ancadjrr        = ancadjrr)
 
   class(val) <- "eppfp"
   return(val)
@@ -239,6 +262,9 @@ prev.epp <- function(mod){
 
 fnPregPrev.epp <- function(mod, fp){
 
+  if(fp$ancadj)
+    return(prev(mod) / fp$ancadjrr)
+  
   pregweight.hivn <- mod[,1,1]
   pregweight.hivp <- rowSums(sweep(mod[,-1,1:3], 2, fp$cd4stage.weight, "*"))
   pregweight.art1yr <- rowSums(mod[,-1,4]) * fp$art1yr.weight

@@ -2,6 +2,7 @@
 ## exportPattern("^[^\\.]")
 export(fnCreateEPPSubpops, fnCreateLikDat, fnCreateEPPFixPar, fnCreateParam, simmod)
 export(update.eppfp, prev, incid, prev.epp, incid.epp, ll, IMIS)
+export(read_epp_input, read_epp_data, read_epp_subpops)
 S3method(simmod, eppfp)
 import(mvtnorm)
 useDynLib(epp, eppC)
