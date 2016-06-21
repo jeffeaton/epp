@@ -9,7 +9,6 @@
 
 setwd("~/Documents/Code/R/epp/")
 
-source("~/Documents/Code/R/read-epp-spectrum/read-epp-files.R")  # https://github.com/jeffeaton/read-epp-spectrum
 library(epp)
 
 
@@ -20,9 +19,9 @@ library(epp)
 prepare.epp.fit <- function(filepath, proj.end=2015.5){
 
   ## epp
-  eppd <- read.epp.data(paste(filepath, ".xml", sep=""))
-  epp.subp <- read.epp.subpops(paste(filepath, ".xml", sep=""))
-  epp.input <- read.epp.input(filepath)
+  eppd <- read_epp_data(paste(filepath, ".xml", sep=""))
+  epp.subp <- read_epp_subpops(paste(filepath, ".xml", sep=""))
+  epp.input <- read_epp_input(filepath)
 
   epp.subp.input <- fnCreateEPPSubpops(epp.input, epp.subp, eppd)
 
@@ -68,7 +67,7 @@ round(incid(mod.rspline, fp.rspline), 4)  # incidence
 likdat <- attr(bw.out$Urban, "likdat")
 qM <- qnorm(prev(mod.rspline))                              # probit-tranformed prevalence
 log(anclik::fnANClik(qM + fp.rspline$ancbias, likdat$anclik.dat))   # ANC likelihood
-fnHHSll(qM, likdat$hhslik.dat)                              # survey likelihood
+epp:::fnHHSll(qM, likdat$hhslik.dat)                              # survey likelihood
 ll(theta.rspline, fp.rspline, likdat)
 
 
@@ -85,7 +84,7 @@ round(incid(mod.rtrend, fp.rtrend), 4)  # incidence
 
 qM <- qnorm(prev(mod.rtrend))                             # probit-tranformed prevalence
 log(anclik::fnANClik(qM + fp.rtrend$ancbias, likdat$anclik.dat))  # ANC likelihood
-fnHHSll(qM, likdat$hhslik.dat)                             # survey likelihood
+epp:::fnHHSll(qM, likdat$hhslik.dat)                             # survey likelihood
 ll(theta.rtrend, fp.rtrend, likdat)
 
 
