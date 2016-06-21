@@ -265,13 +265,13 @@ mtext("r(t)", 2, 2.5, las=3)
 
 add.b.site <- function(fit){
   qM.mat <- sweep(qnorm(fit$prev), 2, sapply(fit$param, "[[", "ancbias"), "+")
-  fit$b.site <- apply(qM.mat, 2, sample.b.site, fit$likdat$anclik.dat)
+  fit$b.site <- apply(qM.mat, 2, anclik::sample.b.site, fit$likdat$anclik.dat)
   return(fit)
 }
 
 add.pred.site <- function(fit){
   qM.mat <- sweep(qnorm(fit$prev), 2, sapply(fit$param, "[[", "ancbias"), "+")
-  fit$pred.site <- lapply(seq(along=fit$param), function(ii) sample.pred.site(qM.mat[,ii], fit$b.site[,ii], fit$likdat$anclik.dat))
+  fit$pred.site <- lapply(seq(along=fit$param), function(ii) anclik::sample.pred.site(qM.mat[,ii], fit$b.site[,ii], fit$likdat$anclik.dat))
   return(fit)
 }
 
