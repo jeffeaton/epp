@@ -128,7 +128,7 @@ ll <- function(theta, fp, likdat){
   qM.all <- qnorm(prev(mod))
   qM.preg <- if(exists("pregprev", where=fp) && fp$pregprev) qnorm(fnPregPrev(mod, fp)) else qM.all
 
-  if(any(is.na(qM.all)) || any(qM.all[likdat$firstdata.idx:likdat$lastdata.idx] == -Inf))
+  if(any(is.na(qM.all)) || any(qM.all[likdat$firstdata.idx:likdat$lastdata.idx] == -Inf) || any(qM.all[likdat$firstdata.idx:likdat$lastdata.idx] > 2)) # prevalence not greater than pnorm(2) = 0.977
     return(-Inf)
 
   ll.anc <- log(anclik::fnANClik(qM.preg+fp$ancbias, likdat$anclik.dat))
