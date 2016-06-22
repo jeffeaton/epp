@@ -102,17 +102,16 @@ fnCreateEPPFixPar <- function(epp.input,
     ancadj.db <- read.csv(system.file("extdata", "AdultToPWDB_2016.csv", package="epp"))
   } else if(ancadj.yr==2015){
     ancadj.db <- read.csv(system.file("extdata", "AdultToPWDB.csv", package="epp"))
+    names(ancadj.db)[names(ancadj.db) == "Ccode"] <- "Code"
   }
   
   out.steps <- proj.steps[proj.steps %% 1 == dt*floor((1/dt)/2)]
-  ancadj.dat <- ancadj.db[ancadj.db[,1] == attr(epp.input, "country"), paste0("X", 1985:2020)]  
+  ancadj.dat <- subset(ancadj.db, Code == attr(epp.input, "country.code"), paste0("X", 1985:2020))  # Use country-level ratio (same as EPP 2016)
   if(nrow(ancadj.dat) == 0){
     warning(paste(attr(epp.input, "country"), "not found in", ancadj.yr, "ANC adjustment database. Using median trend."), call.=FALSE)
-    ancadj.dat <- ancadj.db[ancadj.db[,1] == "Median", paste0("X", 1985:2020)]
+    ancadj.dat <- subset(ancadj.db, Code == 10000, paste0("X", 1985:2020))
   }
-  ancadjrr <- approx(1985:2020+0.5, ancadj.dat, out.steps, rule=2)$y # take first if multiple for a country
-  ## !!! NOTE: UPDATE TO HANDLE SUBNATIONAL REGIONS
-
+  ancadjrr <- approx(1985:2020+0.5, ancadj.dat, out.steps, rule=2)$y
 
   val <- list(proj.steps      = proj.steps,
               tsEpidemicStart = tsEpidemicStart,
