@@ -3,12 +3,14 @@
 
 #include <math.h>
 
-#define POP_15TO49_COL  0
-#define POP_15ENTER_COL 1
-#define POP_50EXIT_COL  2
-#define POP_NETMIGR_COL 3
-#define POP_A50RATE_COL 4
-#define POP_MX_COL      5
+#define POP_15TO49_COL   0
+#define POP_15ENTER_COL  1
+#define POP_50EXIT_COL   2
+#define POP_NETMIGR_COL  3
+#define POP_HIVP15YR_COL 4
+#define POP_ART15YR_COL  5
+#define POP_A50RATE_COL  6
+#define POP_MX_COL       7
 
 #define EPP_RSPLINE 0
 #define EPP_RTREND 1
@@ -18,11 +20,12 @@ const size_t TS = 4;  // number
 
 
 SEXP eppC(SEXP s_eppPopTS, SEXP s_projsteps, SEXP s_dt,
-	   SEXP s_eppmod,
-	   SEXP s_rspline_rvec, SEXP s_iota, SEXP s_relinfectART, SEXP s_tsEpidemicStart,
-	   SEXP s_rtrend_beta, SEXP s_rtrend_tstabilize, SEXP s_rtrend_r0,
-	   SEXP s_cd4init, SEXP s_cd4prog, SEXP s_cd4artmort,
-	   SEXP s_artnumTS, SEXP s_arteligidxTS){
+	  SEXP s_eppmod,
+	  SEXP s_rspline_rvec, SEXP s_iota, SEXP s_relinfectART, SEXP s_tsEpidemicStart,
+	  SEXP s_rtrend_beta, SEXP s_rtrend_tstabilize, SEXP s_rtrend_r0,
+	  SEXP s_cd4init, SEXP s_cd4prog, SEXP s_cd4artmort,
+	  SEXP s_artnumTS, SEXP s_arteligidxTS, SEXP s_specpop_perceligTS,
+	  SEXP s_hivp15yr_cd4dist, SEXP s_art15yr_cd4dist){
 
   size_t nsteps = length(s_projsteps);
   double dt = *REAL(s_dt);
@@ -31,6 +34,8 @@ SEXP eppC(SEXP s_eppPopTS, SEXP s_projsteps, SEXP s_dt,
   double *pop15to49_ts = REAL(VECTOR_ELT(s_eppPopTS, POP_15TO49_COL));
   double *age15enter_ts = REAL(VECTOR_ELT(s_eppPopTS, POP_15ENTER_COL));
   double *netmigr_ts = REAL(VECTOR_ELT(s_eppPopTS, POP_NETMIGR_COL));
+  double *hivp15yr_ts = REAL(VECTOR_ELT(s_eppPopTS, POP_HIVP15YR_COL));
+  double *art15yr_ts = REAL(VECTOR_ELT(s_eppPopTS, POP_ART15YR_COL));
   double *age50rate_ts = REAL(VECTOR_ELT(s_eppPopTS, POP_A50RATE_COL));
   double *mx_ts = REAL(VECTOR_ELT(s_eppPopTS, POP_MX_COL));
 
@@ -61,6 +66,10 @@ SEXP eppC(SEXP s_eppPopTS, SEXP s_projsteps, SEXP s_dt,
 
   double *artnum_ts = REAL(s_artnumTS);
   int *arteligidx_ts = INTEGER(s_arteligidxTS);
+  double *specpop_perceligTS = REAL(s_specpop_perceligTS);
+
+  double *hivp15yr_cd4dist = REAL(s_hivp15yr_cd4dist);
+  double *art15yr_cd4dist = REAL(s_art15yr_cd4dist);
   
   
   // initialise output
@@ -123,7 +132,7 @@ SEXP eppC(SEXP s_eppPopTS, SEXP s_projsteps, SEXP s_dt,
 	rvec[ts] = rtrend_r0;
       }
     }
-    
+
     // ageing, natural mortality, and net migration
     double grad[DS][TS];
     for(size_t m = 0; m < DS; m++)
@@ -131,7 +140,11 @@ SEXP eppC(SEXP s_eppPopTS, SEXP s_projsteps, SEXP s_dt,
 	grad[m][u] = X[m][u] * (-age50rate_ts[ts] - mx_ts[ts] + netmigr_ts[ts]/(Xtot * dt));
 
     // new entrants
-    grad[0][0] += age15enter_ts[ts] / dt;
+    grad[0][0] += (age15enter_ts[ts] - hivp15yr_ts[ts]) / dt;
+    for(size_t m = 1; m < DS; m++){
+      grad[m][0] += hivp15yr_cd4dist[m-1] * (hivp15yr_ts[ts] - art15yr_ts[ts]) / dt;
+      grad[m][3] += art15yr_cd4dist[m-1] * art15yr_ts[ts] / dt;  // Assume been on ART 1+ years (not sure what EPP does)
+    }
 
     // new HIV infections
     double incrate = rvec[ts] * (Xhivp_noart + relinfectART*Xonart)/Xtot + ((projsteps[ts] == tsEpidemicStart)?iota:0);
@@ -165,20 +178,23 @@ SEXP eppC(SEXP s_eppPopTS, SEXP s_projsteps, SEXP s_dt,
 	  artchange += grad[m][u];
 
       size_t artelig_idx = arteligidx_ts[ts] - 1; 	// -1 for 0-based indexing vs. 1-based indexing in R
+      double specpop_percelig = specpop_perceligTS[ts];
       double art_anninits = (artnum_ts[ts] - Xonart) / dt - artchange;
 
       // determine number weights for number from each stage (average of expected mortality and eligibility)
       double sum_mortweight = 0.0, artelig = 0.0;
-      for(size_t m = artelig_idx; m < DS; m++){
-	artelig += X[m][0];
-	sum_mortweight += cd4artmort[m-1][0] * X[m][0];
+      for(size_t m = (specpop_percelig > 0) ? 1 : artelig_idx; m < DS; m++){
+	double artelig_m = (m < artelig_idx) ? specpop_percelig * X[m][0] : X[m][0];
+	artelig += artelig_m;
+	sum_mortweight += cd4artmort[m-1][0] * artelig_m;
       }
       // determine rate to initiate each stage
       double artinitweight[DS], artstageinit[DS];
-      for(size_t m = artelig_idx; m < DS; m++){
+      for(size_t m = (specpop_percelig > 0) ? 1 : artelig_idx; m < DS; m++){
 	artinitweight[m] = (cd4artmort[m-1][0]/sum_mortweight + 1.0/artelig)/2.0;
-	artstageinit[m] = art_anninits * artinitweight[m] * X[m][0];
-	artstageinit[m] = (artstageinit[m] > X[m][0]/dt) ? X[m][0]/dt : artstageinit[m]; // check not greater than number in stage
+	double artelig_m = (m < artelig_idx) ? specpop_percelig * X[m][0] : X[m][0];
+	artstageinit[m] = art_anninits * artinitweight[m] * artelig_m;
+	artstageinit[m] = (artstageinit[m] > artelig_m/dt) ? artelig_m/dt : artstageinit[m]; // check not greater than number eligible
 	artstageinit[m] = (artstageinit[m] > (X[m][0]/dt + grad[m][0])) ? (X[m][0]/dt + grad[m][0]) : artstageinit[m]; // check number on stage won't be less than 0;
 
 	grad[m][0] -= artstageinit[m];

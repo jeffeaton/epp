@@ -22,10 +22,13 @@ fnCreateEPPSubpops <- function(epp.input, epp.subpops, epp.data){
 
     epp.subpop.input[[subpop]] <- epp.input
     epp.subpop.input[[subpop]]$epp.pop <- epp.subpops$subpops[[subpop]]
+    epp.subpop.input[[subpop]]$epp.pop$cd4median <- epp.input$epp.pop$cd4median
+    epp.subpop.input[[subpop]]$epp.pop$hivp15yr <- epp.input$epp.pop$hivp15yr * art.dist[subpop] # assume distributed same as art.dist (not sure what EPP does)
 
     epp.art <- epp.input$epp.art
     epp.art$m.val[epp.art$m.isperc == "N"] <- epp.art$m.val[epp.art$m.isperc == "N"] * art.dist[subpop]
     epp.art$f.val[epp.art$f.isperc == "N"] <- epp.art$f.val[epp.art$f.isperc == "N"] * art.dist[subpop]
+    epp.art$art15yr <- epp.art$art15yr * art.dist[subpop]
 
     epp.subpop.input[[subpop]]$epp.art <- epp.art
   }
@@ -47,21 +50,26 @@ fnCreateEPPFixPar <- function(epp.input,
   ##  Population inputs  ##
   #########################
 
-  epp.pop <- epp.input$epp.pop
+  epp.pop <- merge(epp.input$epp.pop, epp.input$epp.art[c("year", "art15yr")], all.x=TRUE)
+  epp.pop$art15yr[is.na(epp.pop$art15yr)] <- 0
   proj.steps <- seq(proj.start, proj.end, dt)
   epp.pop.ts <- data.frame(pop15to49 = approx(epp.pop$year+0.5, epp.pop$pop15to49, proj.steps)$y,
                            age15enter = approx(epp.pop$year+0.5, dt*epp.pop$pop15, proj.steps)$y,
                            age50exit = approx(epp.pop$year+0.5, dt*epp.pop$pop50, proj.steps)$y,
-                           netmigr = approx(epp.pop$year+0.5, dt*epp.pop$netmigr, proj.steps)$y)
-
+                           netmigr = approx(epp.pop$year+0.5, dt*epp.pop$netmigr, proj.steps)$y,
+                           hivp15yr = approx(epp.pop$year+0.5, dt*epp.pop$hivp15yr, proj.steps)$y,
+                           art15yr = approx(epp.pop$year+0.5, dt*epp.pop$art15yr, proj.steps, rule=2)$y)
+  
   proj.years <- floor(proj.steps)
-
+  
   epp.pop.ts$netmigr <- epp.pop.ts$netmigr * with(subset(epp.pop, epp.pop$year %in% proj.years), rep(ifelse(netmigr != 0, netmigr * table(proj.years) * dt / tapply(epp.pop.ts$netmigr, floor(proj.steps), sum), 0), times=table(proj.years)))
+  epp.pop.ts$hivp15yr <- epp.pop.ts$hivp15yr * with(subset(epp.pop, epp.pop$year %in% proj.years), rep(ifelse(hivp15yr != 0, hivp15yr * table(proj.years) * dt / tapply(epp.pop.ts$hivp15yr, floor(proj.steps), sum), 0), times=table(proj.years)))
+  epp.pop.ts$art15yr <- epp.pop.ts$art15yr * with(subset(epp.pop, epp.pop$year %in% proj.years), rep(ifelse(art15yr != 0, art15yr * table(proj.years) * dt / tapply(epp.pop.ts$art15yr, floor(proj.steps), sum), 0), times=table(proj.years)))
   epp.pop.ts$age50rate <- (epp.pop.ts$age50exit/epp.pop.ts$pop15to49)/dt
   epp.pop.ts$mx <- c(1.0 - (epp.pop.ts$pop15to49[-1] - (epp.pop.ts$age15enter - epp.pop.ts$age50exit + epp.pop.ts$netmigr)[-length(proj.steps)]) / epp.pop.ts$pop15to49[-length(proj.steps)], NA) / dt
   epp.pop.ts[length(proj.steps), "mx"] <- epp.pop.ts[length(proj.steps)-1, "mx"]
-
-
+  
+  
   ##################
   ##  ART inputs  ##
   ##################
@@ -74,16 +82,19 @@ fnCreateEPPFixPar <- function(epp.input,
 
   epp.art$artelig.idx <- match(epp.art$cd4thresh, c(1, 2, 500, 350, 250, 200, 100, 50))
   artelig.idx.ts <- approx(epp.art$year, epp.art$artelig.idx, proj.steps, "constant", rule=2)$y
-
+  
+  epp.art$specpop.percelig <- rowSums(with(epp.input$art.specpop, mapply(function(percent, year) rep(c(0, percent), c(year - min(epp.art$year), max(epp.art$year) - year+1)), percelig, yearelig)))
+  specpop.percelig.ts <- approx(epp.art$year+0.5, epp.art$specpop.percelig, proj.steps, "constant", rule=2)$y
+  
   cd4prog <- 1/colMeans(epp.input$cd4stage.dur[c(2:3,6:7),])
   cd4init <- 0.01*colMeans(epp.input$cd4initperc[c(2:3,6:7),])
   cd4artmort <- cbind(colMeans(epp.input$cd4mort[c(2:3,6:7),]),
                       colMeans(epp.input$artmort.less6mos[c(2:3,6:7),]),
                       colMeans(epp.input$artmort.6to12mos[c(2:3,6:7),]),
                       colMeans(epp.input$artmort.after1yr[c(2:3,6:7),]))
-
+  
   relinfectART <- 1.0 - epp.input$infectreduc
-
+  
 
   ###########################
   ##  r-spline parameters  ##
@@ -119,10 +130,13 @@ fnCreateEPPFixPar <- function(epp.input,
               epp.pop.ts      = epp.pop.ts,
               artnum.ts       = artnum.ts,
               artelig.idx.ts  = artelig.idx.ts,
+              specpop.percelig.ts = specpop.percelig.ts,
               cd4prog         = cd4prog,
               cd4init         = cd4init,
               cd4artmort      = cd4artmort,
               relinfectART    = relinfectART,
+              hivp15yr.cd4dist = epp.input$hivp15yr.cd4dist,
+              art15yr.cd4dist = epp.input$art15yr.cd4dist,
               numKnots        = numKnots,
               rvec.spldes     = rvec.spldes,
               iota            = 0.0025,
@@ -160,7 +174,8 @@ simmod.eppfp <- function(fp, VERSION = "C"){
                  fp$rvec, fp$iota, fp$relinfectART, as.numeric(fp$tsEpidemicStart),
                  fp$rtrend$beta, fp$rtrend$tStabilize, fp$rtrend$r0,
                  fp$cd4init, fp$cd4prog, fp$cd4artmort,
-                 fp$artnum.ts, as.integer(fp$artelig.idx.ts))
+                 fp$artnum.ts, as.integer(fp$artelig.idx.ts), fp$specpop.percelig.ts,
+                 fp$hivp15yr.cd4dist, fp$art15yr.cd4dist)
     class(mod) <- "epp"
     return(mod)
   }
@@ -199,7 +214,9 @@ simmod.eppfp <- function(fp, VERSION = "C"){
     incr(grad) <- -X * (epp.pop.ts$age50rate[ts] + epp.pop.ts$mx[ts])
 
     ## new entrants
-    incr(grad[1,1]) <- epp.pop.ts$age15enter[ts] / dt  # convert to annual rate
+    incr(grad[1,1]) <- (epp.pop.ts$age15enter[ts] - epp.pop.ts$hivp15yr[ts]) / dt  # convert to annual rate
+    incr(grad[-1,1]) <- fp$hivp15yr.cd4dist * (epp.pop.ts$hivp15yr[ts] - epp.pop.ts$art15yr[ts]) / dt
+    incr(grad[-1, TS]) <- fp$art15yr.cd4dist * epp.pop.ts$art15yr[ts] / dt # assume ART duration > 1 year (Not sure what EPP does)
 
     ## net migrants
     incr(grad) <- X/sum(X) * epp.pop.ts$netmigr[ts] / dt
@@ -221,15 +238,17 @@ simmod.eppfp <- function(fp, VERSION = "C"){
       artnum.curr <- sum(X[-1,-1])
       artnum.anninits <- (fp$artnum.ts[ts] - artnum.curr)/dt - sum(grad[-1,-1]) # desired change rate minus current exits
 
-      artelig <- X[fp$artelig.idx.ts[ts]:DS,1]
-      expect.mort.weight <- fp$cd4artmort[fp$artelig.idx.ts[ts]:DS - 1, 1] / sum(artelig * fp$cd4artmort[fp$artelig.idx.ts[ts]:DS - 1, 1])
+      artcd4propelig <- rep(c(fp$specpop.percelig.ts[ts], 1.0),
+                            c(fp$artelig.idx.ts[ts]-2, DS-fp$artelig.idx.ts[ts]+1L))
+      artelig <- artcd4propelig * X[-1,1]
+      expect.mort.weight <- fp$cd4artmort[, 1] / sum(artelig * fp$cd4artmort[, 1])
       artinit.weight <- (expect.mort.weight + 1/sum(artelig))/2  # average eligibility and expected mortality
       artinit.ann.ts <- pmin(artnum.anninits * artinit.weight * artelig,
                              artelig/dt,                                   # check that don't initiate more than the number eligible
-                             artelig/dt + grad[fp$artelig.idx.ts[ts]:DS,1], na.rm=TRUE)
+                             X[-1,1]/dt + grad[-1,1], na.rm=TRUE)
 
-      incr(grad[fp$artelig.idx.ts[ts]:DS, 1]) <- -artinit.ann.ts
-      incr(grad[fp$artelig.idx.ts[ts]:DS, 2]) <- artinit.ann.ts
+      incr(grad[-1, 1]) <- -artinit.ann.ts
+      incr(grad[-1, 2]) <- artinit.ann.ts
     }
 
     ## store prevalence to use in next time step

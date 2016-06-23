@@ -46,8 +46,56 @@ read_epp_input <- function(ep.path){
   infectreduc <- as.numeric(read.csv(text=ep4[infectreduc.idx], header=FALSE)[2])
 
   epp.art <- setNames(read.csv(text=ep4[artstart.idx:artend.idx], header=FALSE, as.is=TRUE),
-                      c("year", "m.isperc", "m.val", "f.isperc", "f.val", "cd4thresh", "m.perc50plus", "f.perc50plus", "perc50plus", ""))
+                      c("year", "m.isperc", "m.val", "f.isperc", "f.val", "cd4thresh", "m.perc50plus", "f.perc50plus", "perc50plus", "1stto2ndline"))
 
+  specpop.idx <- grep("SPECPOP", ep4)
+  art.specpop <- read.csv(text=ep4[specpop.idx], header=FALSE,
+                          colClasses=c("NULL", "character", "numeric", "integer"),
+                          col.names=c(NA, "specpop", "percelig", "yearelig"))
+  art.specpop$percelig <- art.specpop$percelig/100
+  
+
+  cd4median.start.idx <- which(ep4 == "CD4MEDIAN_START")+1
+  cd4median.end.idx <- which(ep4 == "CD4MEDIAN_END")-1
+  if(length(cd4median.start.idx) > 0)
+    epp.pop$cd4median <- read.csv(text=ep4[cd4median.start.idx:cd4median.end.idx], header=FALSE, colClasses=c("NULL", "numeric"))[[1]]
+  else
+    epp.pop$cd4median <- 0
+                             
+  hivp15yr.start.idx <- which(ep4 == "HIVPOS_15YEAROLDS")+1
+  hivp15yr.end.idx <- which(ep4 == "HIVPOS_15YEAROLDS_END")-1
+  if(length(hivp15yr.start.idx) > 0)
+    epp.pop$hivp15yr <- read.csv(text=ep4[hivp15yr.start.idx:hivp15yr.end.idx], header=FALSE, colClasses=c("NULL", "numeric"))[[1]]
+  else
+    epp.pop$hivp15yr <- 0
+
+  art15yr.start.idx <- which(ep4 == "HIVPOS_15YEAROLDSART")+1
+  art15yr.end.idx <- which(ep4 == "HIVPOS_15YEAROLDSART_END")-1
+  if(length(art15yr.start.idx) > 0)
+    epp.art$art15yr <- read.csv(text=ep4[art15yr.start.idx:art15yr.end.idx], header=FALSE, colClasses=c("NULL", "numeric"))[[1]]
+  else
+    epp.art$art15yr <- 0
+
+  artdropout.start.idx <- which(ep4 == "ARTDROPOUTRATE")+1
+  artdropout.end.idx <- which(ep4 == "ARTDROPOUTRATE_END")-1
+  if(length(artdropout.start.idx) > 0)
+    epp.art$artdropout <- read.csv(text=ep4[artdropout.start.idx:artdropout.end.idx], header=FALSE, colClasses=c("NULL", "numeric"))[[1]]
+  else
+    epp.art$artdropout <- 0
+
+  hivp15yr.cd4dist.idx <- which(ep4 == "HIVPOS15_CD4")+1
+  if(length(hivp15yr.cd4dist.idx) > 0)
+    hivp15yr.cd4dist <- as.numeric(read.csv(text=ep4[hivp15yr.cd4dist.idx], header=FALSE))
+  else
+    hivp15yr.cd4dist <- rep(0, length(cd4lim))
+
+  art15yr.cd4dist.idx <- which(ep4 == "HIVPOS15ART_CD4")+1
+  if(length(art15yr.cd4dist.idx) > 0)
+    art15yr.cd4dist <- as.numeric(read.csv(text=ep4[art15yr.cd4dist.idx], header=FALSE))
+  else
+    art15yr.cd4dist <- rep(0, length(cd4lim))
+
+  
   eppin <- list(start.year       = start.year,
                 stop.year        = stop.year,
                 epp.pop          = epp.pop,
@@ -59,7 +107,10 @@ read_epp_input <- function(ep.path){
                 artmort.6to12mos = alpha2,
                 artmort.after1yr = alpha3,
                 infectreduc      = infectreduc,
-                epp.art          = epp.art)
+                epp.art          = epp.art,
+                art.specpop      = art.specpop,
+                hivp15yr.cd4dist = hivp15yr.cd4dist,
+                art15yr.cd4dist  = art15yr.cd4dist)
   class(eppin) <- "eppin"
   attr(eppin, "country") <- country
   attr(eppin, "country.code") <- country.code
