@@ -95,6 +95,18 @@ read_epp_input <- function(ep.path){
   else
     art15yr.cd4dist <- rep(0, length(cd4lim))
 
+
+  ## Between 2014 and 2015, Spectrum switched from passing CD4 stage duration to passing
+  ## CD4 stage progression rate. This change is unmarked in the .ep4 file.  Guess which
+  ## is correct based on the first stage duration, assuming first stage should be > 1 year.
+  ## THIS IS NOT IDIOT PROOF!!!!
+
+  if(mean(lambda[,1]) > 1)
+    lambda <- lambda
+  else
+    lambda <- 1/lambda
+
+  
   
   eppin <- list(start.year       = start.year,
                 stop.year        = stop.year,
