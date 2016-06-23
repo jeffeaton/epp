@@ -1,9 +1,3 @@
-## source("R/epp.R")
-## source("R/generics.R")
-
-## source("R/IMIS.R")
-
-
 #################
 ####  Prior  ####
 #################
@@ -126,7 +120,7 @@ ll <- function(theta, fp, likdat){
   mod <- simmod(fp)
 
   qM.all <- qnorm(prev(mod))
-  qM.preg <- if(exists("pregprev", where=fp) && fp$pregprev) qnorm(fnPregPrev(mod, fp)) else qM.all
+  qM.preg <- if(exists("pregprev", where=fp) && !fp$pregprev) qM.all else qnorm(fnPregPrev(mod, fp))
 
   if(any(is.na(qM.preg)) || any(qM.preg[likdat$firstdata.idx:likdat$lastdata.idx] == -Inf) || any(qM.preg[likdat$firstdata.idx:likdat$lastdata.idx] > 2)) # prevalence not greater than pnorm(2) = 0.977
     return(-Inf)
