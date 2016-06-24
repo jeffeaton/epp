@@ -22,6 +22,8 @@ t0.unif.prior <- c(1970, 1990)
 t1.unif.prior <- c(10, 30)
 logr0.unif.prior <- c(1/11.5, 10)
 rtrend.beta.pr.sd <- 0.2
+
+vinfl.prior.rate <- 1/0.015
   
 
 lprior <- function(theta, fp){
@@ -36,14 +38,16 @@ lprior <- function(theta, fp){
     return(sum(dnorm(theta[3:nk], 0, sqrt(tau2), log=TRUE)) +
            dunif(theta[nk+1], logiota.unif.prior[1], logiota.unif.prior[2], log=TRUE) + 
            dnorm(theta[nk+2], ancbias.pr.mean, ancbias.pr.sd, log=TRUE) +
-           ldinvgamma(tau2, invGammaParameter, invGammaParameter) + log(tau2))  # + log(tau2): multiply likelihood by jacobian of exponential transformation
+           ldinvgamma(tau2, invGammaParameter, invGammaParameter) + log(tau2) +  # + log(tau2): multiply likelihood by jacobian of exponential transformation
+           dexp(exp(theta[nk+4]), vinfl.prior.rate, TRUE) + theta[nk+4])         # additional ANC variance
   } else { # rtrend
 
     return(dunif(theta[1], t0.unif.prior[1], t0.unif.prior[2], log=TRUE) +
            dunif(theta[2], t1.unif.prior[1], t1.unif.prior[2], log=TRUE) +
            dunif(theta[3], logr0.unif.prior[1], logr0.unif.prior[2], log=TRUE) +
            sum(dnorm(theta[4:7], 0, rtrend.beta.pr.sd, log=TRUE)) +
-           dnorm(theta[8], ancbias.pr.mean, ancbias.pr.sd, log=TRUE))
+           dnorm(theta[8], ancbias.pr.mean, ancbias.pr.sd, log=TRUE) +
+           dexp(exp(theta[9]), vinfl.prior.rate, TRUE) + theta[9])   # additional ANC variance
   }
 }
 
@@ -98,13 +102,15 @@ fnCreateParam <- function(theta, fp){
     
     return(list(rvec = as.vector(fp$rvec.spldes %*% beta),
                 iota = exp(theta[fp$numKnots+1]),
-                ancbias = theta[fp$numKnots+2]))
+                ancbias = theta[fp$numKnots+2],
+                v.infl = exp(theta[fp$numKnots+4])))
   } else { # rtrend
     return(list(tsEpidemicStart = fp$proj.steps[which.min(abs(fp$proj.steps - theta[1]))], # t0
                 rtrend = list(tStabilize = theta[1]+theta[2],  # t0 + t1
                               r0 = exp(theta[3]),              # r0
                               beta = theta[4:7]),
-                ancbias = theta[8]))
+                ancbias = theta[8],
+                v.infl = exp(theta[9])))
   }
 }
 
@@ -125,7 +131,7 @@ ll <- function(theta, fp, likdat){
   if(any(is.na(qM.preg)) || any(qM.preg[likdat$firstdata.idx:likdat$lastdata.idx] == -Inf) || any(qM.preg[likdat$firstdata.idx:likdat$lastdata.idx] > 2)) # prevalence not greater than pnorm(2) = 0.977
     return(-Inf)
 
-  ll.anc <- log(anclik::fnANClik(qM.preg+fp$ancbias, likdat$anclik.dat))
+  ll.anc <- log(anclik::fnANClik(qM.preg+fp$ancbias, likdat$anclik.dat, fp$v.infl))
   ll.hhs <- fnHHSll(qM.all, likdat$hhslik.dat)
 
   if(exists("equil.rprior", where=fp) && fp$equil.rprior){
@@ -153,7 +159,7 @@ sample.prior <- function(n){
 
   if(fp$eppmod == "rspline"){
        
-    mat <- matrix(NA, n, fp$numKnots+3)
+    mat <- matrix(NA, n, fp$numKnots+4)
 
     ## sample penalty variance
     tau2 <- rexp(n, tau2.prior.rate)                  # variance of second-order spline differences
@@ -163,16 +169,18 @@ sample.prior <- function(n){
     mat[,fp$numKnots+1] <-  runif(n, logiota.unif.prior[1], logiota.unif.prior[2])  # iota
     mat[,fp$numKnots+2] <-  rnorm(n, ancbias.pr.mean, ancbias.pr.sd)                # ancbias parameter
     mat[,fp$numKnots+3] <- log(tau2)                                                # tau2
+    mat[,fp$numKnots+4] <- log(rexp(n, vinfl.prior.rate))                           # v.infl
 
   } else { # r-trend
 
-    mat <- matrix(NA, n, 8)
+    mat <- matrix(NA, n, 9)
 
     mat[,1] <- runif(n, t0.unif.prior[1], t0.unif.prior[2])        # t0
     mat[,2] <- runif(n, t1.unif.prior[1], t1.unif.prior[2])        # t1
     mat[,3] <- runif(n, logr0.unif.prior[1], logr0.unif.prior[2])  # r0
     mat[,4:7] <- rnorm(4*n, 0, rtrend.beta.pr.sd)                  # beta
     mat[,8] <- rnorm(n, ancbias.pr.mean, ancbias.pr.sd)            # ancbias parameter
+    mat[,9] <- log(rexp(n, vinfl.prior.rate))                      # v.infl
   }
   
   return(mat)
