@@ -44,7 +44,7 @@ fnCreateEPPFixPar <- function(epp.input,
                               tsEpidemicStart = proj.start,
                               cd4stage.weights=c(1.3, 0.6, 0.1, 0.1, 0.0, 0.0, 0.0),
                               art1yr.weight = 0.1,
-                              ancadj=TRUE, ancadj.yr=2015){
+                              ancadj=TRUE, ancadj.yr=2016){
 
   #########################
   ##  Population inputs  ##
