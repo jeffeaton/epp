@@ -80,7 +80,7 @@ fnHHSll <- function(qM, hhslik.dat){
 
 fnCreateLikDat <- function(epp.data, anchor.year=1970L){
 
-  likdat <- list(anclik.dat = anclik::fnPrepareANCLikelihoodData(epp.data$anc.prev, epp.data$anc.n, , anchor.year=anchor.year),
+  likdat <- list(anclik.dat = anclik::fnPrepareANCLikelihoodData(epp.data$anc.prev, epp.data$anc.n, epp.data$anc.used, anchor.year=anchor.year),
                  hhslik.dat = fnPrepareHHSLikData(epp.data$hhs, anchor.year=anchor.year))
   likdat$lastdata.idx <- max(unlist(likdat$anclik.dat$anc.idx.lst), likdat$hhslik.dat$idx)
   likdat$firstdata.idx <- min(unlist(likdat$anclik.dat$anc.idx.lst), likdat$hhslik.dat$idx)
