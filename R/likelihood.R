@@ -23,8 +23,7 @@ t1.unif.prior <- c(10, 30)
 logr0.unif.prior <- c(1/11.5, 10)
 rtrend.beta.pr.sd <- 0.2
 
-vinfl.prior.rate <- 1/0.015
-  
+## vinfl.prior.rate <- 1/0.015
 
 lprior <- function(theta, fp){
 
@@ -35,20 +34,27 @@ lprior <- function(theta, fp){
     nk <- fp$numKnots
     tau2 <- exp(theta[nk+3])
     
-    return(sum(dnorm(theta[3:nk], 0, sqrt(tau2), log=TRUE)) +
-           dunif(theta[nk+1], logiota.unif.prior[1], logiota.unif.prior[2], log=TRUE) + 
-           dnorm(theta[nk+2], ancbias.pr.mean, ancbias.pr.sd, log=TRUE) +
-           ldinvgamma(tau2, invGammaParameter, invGammaParameter) + log(tau2) +  # + log(tau2): multiply likelihood by jacobian of exponential transformation
-           dexp(exp(theta[nk+4]), vinfl.prior.rate, TRUE) + theta[nk+4])         # additional ANC variance
+    val <- sum(dnorm(theta[3:nk], 0, sqrt(tau2), log=TRUE)) +
+      dunif(theta[nk+1], logiota.unif.prior[1], logiota.unif.prior[2], log=TRUE) + 
+      dnorm(theta[nk+2], ancbias.pr.mean, ancbias.pr.sd, log=TRUE) +
+      ldinvgamma(tau2, invGammaParameter, invGammaParameter) + log(tau2)    # + log(tau2): multiply likelihood by jacobian of exponential transformation
+    
+    if(!is.null(fp$vinfl.prior.rate))
+      val <- val + dexp(exp(theta[nk+4]), fp$vinfl.prior.rate, log=TRUE) + theta[nk+4]  # additional ANC variance
+                    
   } else { # rtrend
 
-    return(dunif(theta[1], t0.unif.prior[1], t0.unif.prior[2], log=TRUE) +
+    val <- dunif(theta[1], t0.unif.prior[1], t0.unif.prior[2], log=TRUE) +
            dunif(theta[2], t1.unif.prior[1], t1.unif.prior[2], log=TRUE) +
            dunif(theta[3], logr0.unif.prior[1], logr0.unif.prior[2], log=TRUE) +
            sum(dnorm(theta[4:7], 0, rtrend.beta.pr.sd, log=TRUE)) +
-           dnorm(theta[8], ancbias.pr.mean, ancbias.pr.sd, log=TRUE) +
-           dexp(exp(theta[9]), vinfl.prior.rate, TRUE) + theta[9])   # additional ANC variance
+      dnorm(theta[8], ancbias.pr.mean, ancbias.pr.sd, log=TRUE)
+
+    if(!is.null(fp$vinfl.prior.rate))
+      val <- val + dexp(exp(theta[9]), fp$vinfl.prior.rate, log=TRUE) + theta[9] # additional ANC variance
   }
+
+  return(val)
 }
 
 ################################
@@ -100,19 +106,29 @@ fnCreateParam <- function(theta, fp){
     for(i in 3:fp$numKnots)
       beta[i] <- -beta[i-2] + 2*beta[i-1] + u[i]
     
-    return(list(rvec = as.vector(fp$rvec.spldes %*% beta),
+    param <- list(rvec = as.vector(fp$rvec.spldes %*% beta),
                 iota = exp(theta[fp$numKnots+1]),
-                ancbias = theta[fp$numKnots+2],
-                v.infl = exp(theta[fp$numKnots+4])))
+                ancbias = theta[fp$numKnots+2])
+
+    if(!is.null(fp$vinfl.prior.rate))
+      param <- c(param, v.infl=exp(theta[fp$numKnots+4]))
+
+    return(param)
+    
   } else { # rtrend
-    return(list(tsEpidemicStart = fp$proj.steps[which.min(abs(fp$proj.steps - theta[1]))], # t0
-                rtrend = list(tStabilize = theta[1]+theta[2],  # t0 + t1
-                              r0 = exp(theta[3]),              # r0
-                              beta = theta[4:7]),
-                ancbias = theta[8],
-                v.infl = exp(theta[9])))
+    param <- list(tsEpidemicStart = fp$proj.steps[which.min(abs(fp$proj.steps - theta[1]))], # t0
+         rtrend = list(tStabilize = theta[1]+theta[2],  # t0 + t1
+                       r0 = exp(theta[3]),              # r0
+                       beta = theta[4:7]),
+         ancbias = theta[8])
+    
+    if(!is.null(fp$vinfl.prior.rate))
+      param <- c(param, v.infl=exp(theta[9]))
+
+    return(param)
   }
 }
+
 
 ll <- function(theta, fp, likdat){
 
@@ -131,6 +147,10 @@ ll <- function(theta, fp, likdat){
   if(any(is.na(qM.preg)) || any(qM.preg[likdat$firstdata.idx:likdat$lastdata.idx] == -Inf) || any(qM.preg[likdat$firstdata.idx:likdat$lastdata.idx] > 2)) # prevalence not greater than pnorm(2) = 0.977
     return(-Inf)
 
+  ## calculate v.infl if it is NULL
+  if(is.null(fp$v.infl)) # MLE estimator
+    fp$v.infl <- calc.v.infl(qM.preg, likdat$anclik.dat, fp)
+
   ll.anc <- log(anclik::fnANClik(qM.preg+fp$ancbias, likdat$anclik.dat, fp$v.infl))
   ll.hhs <- fnHHSll(qM.all, likdat$hhslik.dat)
 
@@ -146,6 +166,22 @@ ll <- function(theta, fp, likdat){
 }
 
 
+## Fits v.infl parameter if !is.null(fp$vinfl.prior.rate)
+## If v.infl is.null(), calculates v.infl according to function calc.vinfl
+
+calc.v.infl <- function(qM, anclik.dat, fp){
+  d.lst <- mapply(function(w, idx) w - qM[idx], anclik.dat$W.lst, anclik.dat$anc.idx.lst)
+  rss <- unlist(mapply("-", lapply(mapply("-", d.lst, lapply(d.lst, mean)), function(x) x*x), anclik.dat$v.lst))
+
+  if(!is.null(fp$vinfl.method) && fp$vinfl.method=="unbiased")
+    return(max(sum(rss), 0)/(length(rss) - length(d.lst)))
+  else
+    return(max(sum(rss), 0)/length(rss))
+}
+
+
+
+
 ##########################
 ####  IMIS functions  ####
 ##########################
@@ -156,11 +192,14 @@ sample.prior <- function(n){
 
   if(!exists("eppmod", where = fp))  # backward compatibility
     fp$eppmod <- "rspline"
-
+  
   if(fp$eppmod == "rspline"){
-       
-    mat <- matrix(NA, n, fp$numKnots+4)
-
+    
+    if(!is.null(fp$vinfl.prior.rate)) # estimate v.infl
+      mat <- matrix(NA, n, fp$numKnots+4)
+    else
+      mat <- matrix(NA, n, fp$numKnots+3)
+    
     ## sample penalty variance
     tau2 <- rexp(n, tau2.prior.rate)                  # variance of second-order spline differences
     
@@ -169,20 +208,28 @@ sample.prior <- function(n){
     mat[,fp$numKnots+1] <-  runif(n, logiota.unif.prior[1], logiota.unif.prior[2])  # iota
     mat[,fp$numKnots+2] <-  rnorm(n, ancbias.pr.mean, ancbias.pr.sd)                # ancbias parameter
     mat[,fp$numKnots+3] <- log(tau2)                                                # tau2
-    mat[,fp$numKnots+4] <- log(rexp(n, vinfl.prior.rate))                           # v.infl
-
+    
+    if(!is.null(fp$vinfl.prior.rate))
+      mat[,fp$numKnots+4] <- log(rexp(n, fp$vinfl.prior.rate))                           # v.infl
+    
   } else { # r-trend
-
-    mat <- matrix(NA, n, 9)
-
+    
+    if(!is.null(fp$vinfl.prior.rate)) # estimate v.infl
+      mat <- matrix(NA, n, 9)
+    else
+      mat <- matrix(NA, n, 8)
+    
     mat[,1] <- runif(n, t0.unif.prior[1], t0.unif.prior[2])        # t0
     mat[,2] <- runif(n, t1.unif.prior[1], t1.unif.prior[2])        # t1
     mat[,3] <- runif(n, logr0.unif.prior[1], logr0.unif.prior[2])  # r0
     mat[,4:7] <- rnorm(4*n, 0, rtrend.beta.pr.sd)                  # beta
     mat[,8] <- rnorm(n, ancbias.pr.mean, ancbias.pr.sd)            # ancbias parameter
-    mat[,9] <- log(rexp(n, vinfl.prior.rate))                      # v.infl
+
+    if(!is.null(fp$vinfl.prior.rate))
+      mat[,9] <- log(rexp(n, fp$vinfl.prior.rate))                      # v.infl
   }
   
+
   return(mat)
 }
 
