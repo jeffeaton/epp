@@ -92,34 +92,17 @@ ll(theta.rtrend, fp.rtrend, likdat)
 ####  Fit EPP model  ####
 #########################
 
-fit.mod <- function(obj, ..., B0 = 1e5, B = 1e4, B.re = 3000, number_k = 500){
-  ## ... : updates to fixed parameters (fp) object to specify fitting options
-  
-  likdat <<- attr(obj, 'likdat')  # put in global environment for IMIS functions.
-  fp <<- attr(obj, 'eppfp')
-  fp <<- update(fp, ...)
-  
-  fit <- IMIS(B0, B, B.re, number_k)
-  fit$fp <- fp
-  fit$likdat <- likdat
-
-  rm(fp, likdat, pos=.GlobalEnv)
-
-  return(fit)
-}
-
-
 ## Note: This crashes if there are fewer than two parameter combinations
 ##       with non-zero likelihood. In this case run again with different
 ##       seed, or larger B0.
 
 bw.rspline <- list()
-bw.rspline$Urban <- fit.mod(bw.out$Urban, equil.rprior=TRUE, B0=1e4, B=1e3)
-bw.rspline$Rural <- fit.mod(bw.out$Rural, equil.rprior=TRUE, B0=1e4, B=1e3)
+bw.rspline$Urban <- fit_mod(bw.out$Urban, equil.rprior=TRUE, B0=1e4, B=1e3)
+bw.rspline$Rural <- fit_mod(bw.out$Rural, equil.rprior=TRUE, B0=1e4, B=1e3)
 
 bw.rtrend <- list()
-bw.rtrend$Urban <- fit.mod(bw.out$Urban, eppmod="rtrend", iota=0.0025, B0=1e4, B=1e3)
-bw.rtrend$Rural <- fit.mod(bw.out$Rural, eppmod="rtrend", iota=0.0025, B0=1e4, B=1e3)
+bw.rtrend$Urban <- fit_mod(bw.out$Urban, eppmod="rtrend", iota=0.0025, B0=1e4, B=1e3)
+bw.rtrend$Rural <- fit_mod(bw.out$Rural, eppmod="rtrend", iota=0.0025, B0=1e4, B=1e3)
 
 save(bw.out, bw.rspline, bw.rtrend, file="bw-example-fit.RData")
 
@@ -128,23 +111,14 @@ save(bw.out, bw.rspline, bw.rtrend, file="bw-example-fit.RData")
 ####  Simulate posterior outputs  ####
 ######################################
 
-## simulate incidence and prevalence
-sim.mod <- function(fit){
-  fit$param <- lapply(seq_len(nrow(fit$resample)), function(ii) fnCreateParam(fit$resample[ii,], fit$fp))
-  fp.list <- lapply(fit$param, function(par) update(fit$fp, list=par))
-  fit$mod <- lapply(fp.list, simmod)
-  fit$prev <- sapply(fit$mod, prev)
-  fit$incid <- mapply(incid, mod = fit$mod, fp = fp.list)
-  return(fit)
-}
 
-bw.rspline$Urban <- sim.mod(bw.rspline$Urban)
-bw.rspline$Rural <- sim.mod(bw.rspline$Rural)
+bw.rspline$Urban <- sim_fit(bw.rspline$Urban)
+bw.rspline$Rural <- sim_fit(bw.rspline$Rural)
 
-bw.rtrend$Urban <- sim.mod(bw.rtrend$Urban)
-bw.rtrend$Rural <- sim.mod(bw.rtrend$Rural)
+bw.rtrend$Urban <- sim_fit(bw.rtrend$Urban)
+bw.rtrend$Rural <- sim_fit(bw.rtrend$Rural)
 
-
+  
 ## Plot prevalence, incidence, r(t)
 cred.region <- function(x, y, ...)
   polygon(c(x, rev(x)), c(y[1,], rev(y[2,])), border=NA, ...)
@@ -174,9 +148,8 @@ plot.incid <- function(fit, ylim=c(0, 0.05), col="blue"){
 }
 
 plot.rvec <- function(fit, ylim=c(0, 3), col="blue"){
-  rvec <- lapply(fit$mod, attr, "rvec")
   rvec <- mapply(function(rv, par){replace(rv, fit$fp$proj.steps < par$tsEpidemicStart, NA)},
-                 rvec, fit$param)
+                 data.frame(fit$rvec), fit$param)
   plot(fit$fp$proj.steps, rowMeans(rvec, na.rm=TRUE), type="n", ylim=ylim, ylab="", yaxt="n")
   axis(2, labels=FALSE)
   cred.region(fit$fp$proj.steps, apply(rvec, 1, quantile, c(0.025, 0.975), na.rm=TRUE), col=transp(col, 0.3))
@@ -336,3 +309,57 @@ matplot(seq(0, 1, length.out=length(unlist(bw.rspline$Rural$pred.quant))),
      ylab="Observed quantiles")
 abline(a=0, b=1)
 legend("topleft", c("r-spline", "r-trend"), pch=20, pt.cex=0.5, col=c("darkred", "darkolivegreen"))
+
+
+###################################################################
+####  Compare random-walk projection with r-spline projection  ####
+###################################################################
+
+bw.rwproj <- list()
+bw.rwproj$Urban <- sim_fit(bw.rspline$Urban, rwproj=TRUE)
+bw.rwproj$Rural <- sim_fit(bw.rspline$Rural, rwproj=TRUE)
+
+
+
+quartz(h=3.6, w=6, pointsize=8)
+
+par(mfrow=c(2,3), tcl=-0.25, mgp=c(2.6, 0.5, 0), mar=c(2, 3.5, 2, 1), las=1, cex=1.0)
+##
+plot(2005:2015, rowMeans(bw.rspline$Urban$prev)[36:46], type="n", ylim=c(0.15, 0.3), ylab="prevalence")
+cred.region(2005:2015, apply(bw.rspline$Urban$prev[36:46,], 1, quantile, c(0.025, 0.975)), col=transp("blue", 0.3))
+cred.region(2005:2015, apply(bw.rwproj$Urban$prev[36:46,], 1, quantile, c(0.025, 0.975)), col=transp("darkolivegreen", 0.3))
+matlines(2005:2015, cbind(rowMeans(bw.rspline$Urban$prev[36:46,]), rowMeans(bw.rwproj$Urban$prev[36:46,])), lty=1, lwd=2, col=c("blue", "darkolivegreen"))
+legend("topright", legend=c("rspline", "rw"), lwd=2, col=c("blue", "darkolivegreen"))
+mtext("Botswana Urban", line=0.5, at=2002, adj=0, font=2, cex=1.2)
+##
+plot(2005:2015, rowMeans(bw.rspline$Urban$incid)[36:46], type="n", ylim=c(0.0, 0.02), ylab="incidence")
+cred.region(2005:2015, apply(bw.rspline$Urban$incid[36:46,], 1, quantile, c(0.025, 0.975)), col=transp("blue", 0.3))
+cred.region(2005:2015, apply(bw.rwproj$Urban$incid[36:46,], 1, quantile, c(0.025, 0.975)), col=transp("darkolivegreen", 0.3))
+matlines(2005:2015, cbind(rowMeans(bw.rspline$Urban$incid[36:46,]), rowMeans(bw.rwproj$Urban$incid[36:46,])), lty=1, lwd=2, col=c("blue", "darkolivegreen"))
+legend("topright", legend=c("rspline", "rw"), lwd=2, col=c("blue", "darkolivegreen"))
+##
+plot(seq(2005.5, 2015.5, 0.1), rowMeans(bw.rspline$Urban$rvec)[351:451], type="n", ylim=c(0.03, 0.18), ylab="r(t)")
+cred.region(seq(2005.5, 2015.5, 0.1), apply(bw.rspline$Urban$rvec[351:451,], 1, quantile, c(0.025, 0.975)), col=transp("blue", 0.3))
+cred.region(seq(2005.5, 2015.5, 0.1), apply(bw.rwproj$Urban$rvec[351:451,], 1, quantile, c(0.025, 0.975)), col=transp("darkolivegreen", 0.3))
+matlines(seq(2005.5, 2015.5, 0.1), cbind(rowMeans(bw.rspline$Urban$rvec[351:451,]), rowMeans(bw.rwproj$Urban$rvec[351:451,])), lty=1, lwd=2, col=c("blue", "darkolivegreen"))
+legend("topleft", legend=c("rspline", "rw"), lwd=2, col=c("blue", "darkolivegreen"))
+####
+####
+plot(2005:2015, rowMeans(bw.rspline$Rural$prev)[36:46], type="n", ylim=c(0.15, 0.3), ylab="prevalence")
+cred.region(2005:2015, apply(bw.rspline$Rural$prev[36:46,], 1, quantile, c(0.025, 0.975)), col=transp("blue", 0.3))
+cred.region(2005:2015, apply(bw.rwproj$Rural$prev[36:46,], 1, quantile, c(0.025, 0.975)), col=transp("darkolivegreen", 0.3))
+matlines(2005:2015, cbind(rowMeans(bw.rspline$Rural$prev[36:46,]), rowMeans(bw.rwproj$Rural$prev[36:46,])), lty=1, lwd=2, col=c("blue", "darkolivegreen"))
+legend("topright", legend=c("rspline", "rw"), lwd=2, col=c("blue", "darkolivegreen"))
+mtext("Botswana Rural", line=0.5, at=2002, adj=0, font=2, cex=1.2)
+##
+plot(2005:2015, rowMeans(bw.rspline$Rural$incid)[36:46], type="n", ylim=c(0.0, 0.02), ylab="incidence")
+cred.region(2005:2015, apply(bw.rspline$Rural$incid[36:46,], 1, quantile, c(0.025, 0.975)), col=transp("blue", 0.3))
+cred.region(2005:2015, apply(bw.rwproj$Rural$incid[36:46,], 1, quantile, c(0.025, 0.975)), col=transp("darkolivegreen", 0.3))
+matlines(2005:2015, cbind(rowMeans(bw.rspline$Rural$incid[36:46,]), rowMeans(bw.rwproj$Rural$incid[36:46,])), lty=1, lwd=2, col=c("blue", "darkolivegreen"))
+legend("topright", legend=c("rspline", "rw"), lwd=2, col=c("blue", "darkolivegreen"))
+##
+plot(seq(2005.5, 2015.5, 0.1), rowMeans(bw.rspline$Rural$rvec)[351:451], type="n", ylim=c(0.03, 0.18), ylab="r(t)")
+cred.region(seq(2005.5, 2015.5, 0.1), apply(bw.rspline$Rural$rvec[351:451,], 1, quantile, c(0.025, 0.975)), col=transp("blue", 0.3))
+cred.region(seq(2005.5, 2015.5, 0.1), apply(bw.rwproj$Rural$rvec[351:451,], 1, quantile, c(0.025, 0.975)), col=transp("darkolivegreen", 0.3))
+matlines(seq(2005.5, 2015.5, 0.1), cbind(rowMeans(bw.rspline$Rural$rvec[351:451,]), rowMeans(bw.rwproj$Rural$rvec[351:451,])), lty=1, lwd=2, col=c("blue", "darkolivegreen"))
+legend("topleft", legend=c("rspline", "rw"), lwd=2, col=c("blue", "darkolivegreen"))

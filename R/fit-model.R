@@ -1,0 +1,58 @@
+fit_mod <- function(obj, ..., B0 = 1e5, B = 1e4, B.re = 3000, number_k = 500){
+  ## ... : updates to fixed parameters (fp) object to specify fitting options
+
+  likdat <<- attr(obj, 'likdat')  # put in global environment for IMIS functions.
+  fp <<- attr(obj, 'eppfp')
+  fp <<- update(fp, ...)
+
+  ## If IMIS fails, start again
+  fit <- try(stop(""), TRUE)
+  while(inherits(fit, "try-error")) 
+    fit <- try(IMIS(B0, B, B.re, number_k))
+
+  fit$fp <- fp
+  fit$likdat <- likdat
+
+  rm(fp, likdat, pos=.GlobalEnv)
+
+  return(fit)
+}
+
+
+sim_rvec_rwproj <- function(rvec, firstidx, lastidx){
+  logrvec <- log(rvec)
+  sd <- sqrt(mean(diff(logrvec[firstidx:lastidx])^2))
+  projidx <- (lastidx+1):length(rvec)
+
+  ## simulate differences in projection log(rvec)
+  ## variance increases with time: sigma^2*(t-t1) [Hogan 2012]
+  ldiff <- rnorm(length(projidx), 0, sd*sqrt(projidx-lastidx))
+
+  rvec[projidx] <- exp(logrvec[lastidx] + cumsum(ldiff))
+  return(rvec)
+}
+
+
+## simulate incidence and prevalence
+sim_fit <- function(fit, rwproj=FALSE){
+  fit$param <- lapply(seq_len(nrow(fit$resample)), function(ii) fnCreateParam(fit$resample[ii,], fit$fp))
+
+  if(rwproj){
+    if(exists("eppmod", where=fit$fp) && fit$fp$eppmod == "rtrend")
+      stop("Random-walk projection is only used with r-spline model")
+
+    fit$rvec.spline <- sapply(fit$param, "[[", "rvec")
+    firstidx <- (fit$likdat$firstdata.idx-1)/fit$fp$dt+1
+    lastidx <- (fit$likdat$lastdata.idx-1)/fit$fp$dt+1
+
+    fit$param <- lapply(fit$param, function(par){par$rvec <- sim_rvec_rwproj(par$rvec, firstidx, lastidx); par})
+  }
+  
+  fp.list <- lapply(fit$param, function(par) update(fit$fp, list=par))
+  mod.list <- lapply(fp.list, simmod)
+  
+  fit$rvec <- sapply(mod.list, attr, "rvec")
+  fit$prev <- sapply(mod.list, prev)
+  fit$incid <- mapply(incid, mod = mod.list, fp = fp.list)
+  return(fit)
+}
