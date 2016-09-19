@@ -19,14 +19,17 @@ fit_mod <- function(obj, ..., B0 = 1e5, B = 1e4, B.re = 3000, number_k = 500){
 }
 
 
-sim_rvec_rwproj <- function(rvec, firstidx, lastidx){
+sim_rvec_rwproj <- function(rvec, firstidx, lastidx, dt){
   logrvec <- log(rvec)
   sd <- sqrt(mean(diff(logrvec[firstidx:lastidx])^2))
   projidx <- (lastidx+1):length(rvec)
 
   ## simulate differences in projection log(rvec)
   ## variance increases with time: sigma^2*(t-t1) [Hogan 2012]
-  ldiff <- rnorm(length(projidx), 0, sd*sqrt(projidx-lastidx))
+
+  ## Note: implementation below matches R code from Dan Hogan and Java code
+  ## from Tim Brown. Implies that variance grows at rate dt*(t-t1)
+  ldiff <- rnorm(length(projidx), 0, sd*sqrt((1+dt*(projidx-lastidx-1))))
 
   rvec[projidx] <- exp(logrvec[lastidx] + cumsum(ldiff))
   return(rvec)
@@ -42,10 +45,11 @@ sim_fit <- function(fit, rwproj=FALSE){
       stop("Random-walk projection is only used with r-spline model")
 
     fit$rvec.spline <- sapply(fit$param, "[[", "rvec")
-    firstidx <- (fit$likdat$firstdata.idx-1)/fit$fp$dt+1
+    firstidx <- which(fit$fp$proj.steps == fit$fp$tsEpidemicStart)
     lastidx <- (fit$likdat$lastdata.idx-1)/fit$fp$dt+1
 
-    fit$param <- lapply(fit$param, function(par){par$rvec <- sim_rvec_rwproj(par$rvec, firstidx, lastidx); par})
+    ## replace rvec with random-walk simulated rvec
+    fit$param <- lapply(fit$param, function(par){par$rvec <- sim_rvec_rwproj(par$rvec, firstidx, lastidx, fit$fp$dt); par})
   }
   
   fp.list <- lapply(fit$param, function(par) update(fit$fp, list=par))
