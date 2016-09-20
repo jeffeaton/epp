@@ -5,6 +5,7 @@ export(update.eppfp, prev, fnPregPrev, incid, prev.epp, incid.epp, ll, IMIS)
 export(read_epp_input, read_epp_data, read_epp_subpops)
 export(fitmod, simfit)
 
-S3method(simmod, eppfp, simfit)
+S3method(simmod, eppfp)
+S3method(simfit, eppfit)
 import(mvtnorm)
 useDynLib(epp, eppC)
