@@ -1,4 +1,4 @@
-fit_mod <- function(obj, ..., B0 = 1e5, B = 1e4, B.re = 3000, number_k = 500){
+fitmod <- function(obj, ..., B0 = 1e5, B = 1e4, B.re = 3000, number_k = 500){
   ## ... : updates to fixed parameters (fp) object to specify fitting options
 
   likdat <<- attr(obj, 'likdat')  # put in global environment for IMIS functions.
@@ -14,6 +14,8 @@ fit_mod <- function(obj, ..., B0 = 1e5, B = 1e4, B.re = 3000, number_k = 500){
   fit$likdat <- likdat
 
   rm(fp, likdat, pos=.GlobalEnv)
+
+  class(fit) <- "eppfit"
 
   return(fit)
 }
@@ -37,7 +39,7 @@ sim_rvec_rwproj <- function(rvec, firstidx, lastidx, dt){
 
 
 ## simulate incidence and prevalence
-sim_fit <- function(fit, rwproj=FALSE){
+simfit.eppfit <- function(fit, rwproj=FALSE){
   fit$param <- lapply(seq_len(nrow(fit$resample)), function(ii) fnCreateParam(fit$resample[ii,], fit$fp))
 
   if(rwproj){

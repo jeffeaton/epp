@@ -97,12 +97,12 @@ ll(theta.rtrend, fp.rtrend, likdat)
 ##       seed, or larger B0.
 
 bw.rspline <- list()
-bw.rspline$Urban <- fit_mod(bw.out$Urban, equil.rprior=TRUE, B0=1e4, B=1e3)
-bw.rspline$Rural <- fit_mod(bw.out$Rural, equil.rprior=TRUE, B0=1e4, B=1e3)
+bw.rspline$Urban <- fitmod(bw.out$Urban, equil.rprior=TRUE, B0=1e4, B=1e3)
+bw.rspline$Rural <- fitmod(bw.out$Rural, equil.rprior=TRUE, B0=1e4, B=1e3)
 
 bw.rtrend <- list()
-bw.rtrend$Urban <- fit_mod(bw.out$Urban, eppmod="rtrend", iota=0.0025, B0=1e4, B=1e3)
-bw.rtrend$Rural <- fit_mod(bw.out$Rural, eppmod="rtrend", iota=0.0025, B0=1e4, B=1e3)
+bw.rtrend$Urban <- fitmod(bw.out$Urban, eppmod="rtrend", iota=0.0025, B0=1e4, B=1e3)
+bw.rtrend$Rural <- fitmod(bw.out$Rural, eppmod="rtrend", iota=0.0025, B0=1e4, B=1e3)
 
 save(bw.out, bw.rspline, bw.rtrend, file="bw-example-fit.RData")
 
@@ -112,11 +112,11 @@ save(bw.out, bw.rspline, bw.rtrend, file="bw-example-fit.RData")
 ######################################
 
 
-bw.rspline$Urban <- sim_fit(bw.rspline$Urban)
-bw.rspline$Rural <- sim_fit(bw.rspline$Rural)
+bw.rspline$Urban <- simfit(bw.rspline$Urban)
+bw.rspline$Rural <- simfit(bw.rspline$Rural)
 
-bw.rtrend$Urban <- sim_fit(bw.rtrend$Urban)
-bw.rtrend$Rural <- sim_fit(bw.rtrend$Rural)
+bw.rtrend$Urban <- simfit(bw.rtrend$Urban)
+bw.rtrend$Rural <- simfit(bw.rtrend$Rural)
 
   
 ## Plot prevalence, incidence, r(t)
@@ -316,8 +316,8 @@ legend("topleft", c("r-spline", "r-trend"), pch=20, pt.cex=0.5, col=c("darkred",
 ###################################################################
 
 bw.rwproj <- list()
-bw.rwproj$Urban <- sim_fit(bw.rspline$Urban, rwproj=TRUE)
-bw.rwproj$Rural <- sim_fit(bw.rspline$Rural, rwproj=TRUE)
+bw.rwproj$Urban <- simfit(bw.rspline$Urban, rwproj=TRUE)
+bw.rwproj$Rural <- simfit(bw.rspline$Rural, rwproj=TRUE)
 
 
 
