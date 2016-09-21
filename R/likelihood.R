@@ -187,9 +187,13 @@ sample.prior <- function(n){
 }
 
 prior <- function(theta){
+  if(is.vector(theta))
+    return(exp(lprior(theta, fp)))
   return(unlist(lapply(seq_len(nrow(theta)), function(i) return(exp(lprior(theta[i,], fp))))))
 }
 
 likelihood <- function(theta){
+  if(is.vector(theta))
+    return(exp(ll(theta, fp, likdat)))
   return(unlist(lapply(seq_len(nrow(theta)), function(i) return(exp(ll(theta[i,], fp, likdat))))))
 }
