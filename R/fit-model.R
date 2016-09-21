@@ -1,4 +1,4 @@
-fitmod <- function(obj, ..., B0 = 1e5, B = 1e4, B.re = 3000, number_k = 500){
+fitmod <- function(obj, ..., B0 = 1e5, B = 1e4, B.re = 3000, number_k = 500, D=0){
   ## ... : updates to fixed parameters (fp) object to specify fitting options
 
   likdat <<- attr(obj, 'likdat')  # put in global environment for IMIS functions.
@@ -8,7 +8,7 @@ fitmod <- function(obj, ..., B0 = 1e5, B = 1e4, B.re = 3000, number_k = 500){
   ## If IMIS fails, start again
   fit <- try(stop(""), TRUE)
   while(inherits(fit, "try-error")) 
-    fit <- try(IMIS(B0, B, B.re, number_k))
+    fit <- try(IMIS(B0, B, B.re, number_k, D))
 
   fit$fp <- fp
   fit$likdat <- likdat
