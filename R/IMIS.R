@@ -1,6 +1,9 @@
 ## Modified from IMIS package by Le Bao (http://cran.r-project.org/web/packages/IMIS/)
 
-IMIS <- function(B0, B, B.re, number_k, D=0){
+IMIS <- function(B0, B, B.re, number_k, D=0, fp, likdat,
+                 sample.prior=epp:::sample.prior,
+                 prior=epp:::prior,
+                 likelihood=epp:::likelihood){
 
   if (D==0){
     option.opt <- 0
@@ -9,7 +12,7 @@ IMIS <- function(B0, B, B.re, number_k, D=0){
     option.opt <- 1
   }
   
-  X_k <- sample.prior(B0)  # Draw initial samples from the prior distribution
+  X_k <- sample.prior(B0, fp)  # Draw initial samples from the prior distribution
   X_all <- matrix(0, B0 + B*(D+number_k-1), dim(X_k)[2])
   n_all <- 0
   X_all[1:B0,] <- X_k
@@ -25,8 +28,8 @@ IMIS <- function(B0, B, B.re, number_k, D=0){
     ##Rprof(paste("IMIS-k", k, ".out", sep=""))
     ptm.like = proc.time()
 
-    prior_all[n_all + 1:dim(X_k)[1]] <-  prior(X_k)
-    like_all[n_all + 1:dim(X_k)[1]] <-  likelihood(X_k)
+    prior_all[n_all + 1:dim(X_k)[1]] <-  prior(X_k, fp)
+    like_all[n_all + 1:dim(X_k)[1]] <-  likelihood(X_k, fp, likdat)
     ptm.use = (proc.time() - ptm.like)[3]
     if (k==1)   print(paste(B0, "likelihoods are evaluated in", round(ptm.use/60,2), "minutes"))
     which_pos <- which(like_all[1:(n_all + dim(X_k)[1])] > 0)
@@ -76,7 +79,7 @@ IMIS <- function(B0, B, B.re, number_k, D=0){
         which_exclude = union( which_exclude, important )
         which_remain = setdiff(which_remain, which_exclude)
 
-        nlposterior <- function(theta){-log(prior(theta))-log(likelihood(theta))}
+        nlposterior <- function(theta){-log(prior(theta, fp))-log(likelihood(theta, fp, likdat))}
         ## The rough optimizer uses the Nelder-Mead algorithm.
         if (length(important)==0) X_imp = center_all[1,]
         ptm.opt = proc.time()
@@ -89,16 +92,16 @@ IMIS <- function(B0, B, B.re, number_k, D=0){
         if(inherits(optBFGS, "try-error")){
           print(paste0("D = ", i, "; BFGS optimization failed."))
           print(paste("maximum log posterior=", round(-optNM$value,2),
-                      ", likelihood=", round(log(likelihood(optNM$par)),2), 
-                      ", prior=", round(log(prior(optNM$par)),2),
+                      ", likelihood=", round(log(likelihood(optNM$par, fp, likdat)),2), 
+                      ", prior=", round(log(prior(optNM$par, fp)),2),
                       ", time used=", round(ptm.use/60,2),
                       "minutes, convergence=", optNM$convergence))
           center_all <- rbind(center_all, optNM$par)
           sigma_all[[i]] <- Sig2_global
         } else {
           print(paste("maximum log posterior=", round(-optBFGS$value,2),
-                      ", likelihood=", round(log(likelihood(optBFGS$par)),2), 
-                      ", prior=", round(log(prior(optBFGS$par)),2),
+                      ", likelihood=", round(log(likelihood(optBFGS$par, fp, likdat)),2), 
+                      ", prior=", round(log(prior(optBFGS$par, fp)),2),
                       ", time used=", round(ptm.use/60,2),
                       "minutes, convergence=", optBFGS$convergence))
           center_all <- rbind(center_all, optBFGS$par)  # the center of new samples

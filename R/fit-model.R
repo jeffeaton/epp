@@ -1,19 +1,21 @@
-fitmod <- function(obj, ..., B0 = 1e5, B = 1e4, B.re = 3000, number_k = 500, D=0){
+fitmod <- function(obj, ..., B0 = 1e5, B = 1e4, B.re = 3000, number_k = 500, D=0,
+                   sample.prior=epp:::sample.prior,
+                   prior=epp:::prior,
+                   likelihood=epp:::likelihood){
+
   ## ... : updates to fixed parameters (fp) object to specify fitting options
 
-  likdat <<- attr(obj, 'likdat')  # put in global environment for IMIS functions.
-  fp <<- attr(obj, 'eppfp')
-  fp <<- update(fp, ...)
+  likdat <- attr(obj, 'likdat')  # put in global environment for IMIS functions.
+  fp <- attr(obj, 'eppfp')
+  fp <- update(fp, ...)
 
   ## If IMIS fails, start again
   fit <- try(stop(""), TRUE)
   while(inherits(fit, "try-error")) 
-    fit <- try(IMIS(B0, B, B.re, number_k, D))
-
+    fit <- try(IMIS(B0, B, B.re, number_k, D, fp=fp, likdat=likdat,
+                    sample.prior=sample.prior, prior=prior, likelihood=likelihood))
   fit$fp <- fp
   fit$likdat <- likdat
-
-  rm(fp, likdat, pos=.GlobalEnv)
 
   class(fit) <- "eppfit"
 
