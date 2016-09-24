@@ -97,12 +97,12 @@ ll(theta.rtrend, fp.rtrend, likdat)
 ##       seed, or larger B0.
 
 bw.rspline <- list()
-bw.rspline$Urban <- fitmod(bw.out$Urban, equil.rprior=TRUE, B0=1e4, B=1e3)
-bw.rspline$Rural <- fitmod(bw.out$Rural, equil.rprior=TRUE, B0=1e4, B=1e3)
+bw.rspline$Urban <- fitmod(bw.out$Urban, equil.rprior=TRUE, B0=1e4, B=1e3, D=3, opt_iter=4)
+bw.rspline$Rural <- fitmod(bw.out$Rural, equil.rprior=TRUE, B0=1e4, B=1e3, D=3, opt_iter=4)
 
 bw.rtrend <- list()
-bw.rtrend$Urban <- fitmod(bw.out$Urban, eppmod="rtrend", iota=0.0025, B0=1e4, B=1e3)
-bw.rtrend$Rural <- fitmod(bw.out$Rural, eppmod="rtrend", iota=0.0025, B0=1e4, B=1e3)
+bw.rtrend$Urban <- fitmod(bw.out$Urban, eppmod="rtrend", iota=0.0025, B0=1e4, B=1e3, D=3, opt_iter=4)
+bw.rtrend$Rural <- fitmod(bw.out$Rural, eppmod="rtrend", iota=0.0025, B0=1e4, B=1e3, D=3, opt_iter=4)
 
 save(bw.out, bw.rspline, bw.rtrend, file="bw-example-fit.RData")
 

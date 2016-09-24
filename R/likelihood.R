@@ -150,8 +150,6 @@ ll <- function(theta, fp, likdat){
 ####  IMIS functions  ####
 ##########################
 
-## Note: requires fp and likdat to be in global environment
-
 sample.prior <- function(n, fp){
 
   if(!exists("eppmod", where = fp))  # backward compatibility

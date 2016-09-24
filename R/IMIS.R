@@ -1,26 +1,19 @@
 ## Modified from IMIS package by Le Bao (http://cran.r-project.org/web/packages/IMIS/)
 
-IMIS <- function(B0, B, B.re, number_k, D=0, fp, likdat,
+IMIS <- function(B0, B, B.re, number_k, D=0, opt_iter=0, fp, likdat,
                  sample.prior=epp:::sample.prior,
                  prior=epp:::prior,
                  likelihood=epp:::likelihood){
-
-  if (D==0){
-    option.opt <- 0
-    D <- 1
-  } else {
-    option.opt <- 1
-  }
   
   X_k <- sample.prior(B0, fp)  # Draw initial samples from the prior distribution
-  X_all <- matrix(0, B0 + B*(D+number_k-1), dim(X_k)[2])
+  X_all <- matrix(0, B0 + B*((D-1)*opt_iter+number_k), dim(X_k)[2])
   n_all <- 0
   X_all[1:B0,] <- X_k
   
   Sig2_global = cov(X_all[1:B0,])        # the prior covariance
   stat_all = matrix(NA, 6, number_k)                            # 6 diagnostic statistics at each iteration
   center_all = NULL                                             # centers of Gaussian components
-  prior_all = like_all = gaussian_sum = vector("numeric", B0 + B*(D+number_k-1))
+  prior_all = like_all = gaussian_sum = vector("numeric", B0 + B*((D-1)*opt_iter+number_k))
   sigma_all = list()                                            # covariance matrices of Gaussian components
   
   iter.start.time = proc.time()
@@ -34,14 +27,21 @@ IMIS <- function(B0, B, B.re, number_k, D=0, fp, likdat,
     if (k==1)   print(paste(B0, "likelihoods are evaluated in", round(ptm.use/60,2), "minutes"))
     which_pos <- which(like_all[1:(n_all + dim(X_k)[1])] > 0)
 
-    if(k==2){
-      n_pos <- length(which_pos)
-      gaussian_sum[1:n_pos] <- rowSums(sapply(1:D, function(j) dmvnorm(X_all[which_pos,], center_all[j,], sigma_all[[j]])))
-    } else if(k > 2){
-      gaussian_sum[(n_pos+1):length(which_pos)] <- rowSums(sapply(1:(D+k-3), function(j)dmvnorm(X_all[which_pos[(n_pos+1):length(which_pos)],], center_all[j,], sigma_all[[j]])))
-      n_pos <- length(which_pos)
-      gaussian_sum[1:n_pos] <- gaussian_sum[1:n_pos] + dmvnorm(X_all[which_pos,], center_all[D+k-2,], sigma_all[[D+k-2]])
+    
+    if(k>=2){
+      if(k <= (opt_iter+1)){
+        if(k > 2)
+          gaussian_sum[(n_pos+1):length(which_pos)] <- rowSums(sapply(1:(D*(k-2)), function(j)dmvnorm(X_all[which_pos[(n_pos+1):length(which_pos)],], center_all[j,], sigma_all[[j]])))
+        n_pos <- length(which_pos)
+        gaussian_sum[1:n_pos] <- gaussian_sum[1:n_pos] + rowSums(sapply(D*(k-2)+1:D, function(j) dmvnorm(X_all[which_pos,], center_all[j,], sigma_all[[j]])))
+      } else {
+        if(k > 2)
+          gaussian_sum[(n_pos+1):length(which_pos)] <- rowSums(sapply(1:((D-1)*opt_iter + k-2), function(j)dmvnorm(X_all[which_pos[(n_pos+1):length(which_pos)],], center_all[j,], sigma_all[[j]])))
+        n_pos <- length(which_pos)
+        gaussian_sum[1:n_pos] <- gaussian_sum[1:n_pos] + dmvnorm(X_all[which_pos,], center_all[(D-1)*opt_iter + k-1,], sigma_all[[(D-1)*opt_iter + k-1]])
+      }
     }
+        
 
     
     if (k==1)   envelop_pos = prior_all[which_pos]        # envelop stores the sampling densities
@@ -62,8 +62,9 @@ IMIS <- function(B0, B, B.re, number_k, D=0, fp, likdat,
     print(c(k, round(stat_all[1:4,k], 3), as.numeric(iter.stop.time - iter.start.time)[3]))
     iter.start.time = iter.stop.time
 
-    if(k==1 & option.opt){
+    if(k <= opt_iter){
       ## Sig2_global = cov(X_all[which(like_all>min(like_all)),])  ## !! not sure why recalculating this -- but may be based on few points
+      n_all <- n_all + dim(X_k)[1]
       X_k <- NULL
       which_exclude = NULL					# exclude the neighborhood of the local optima
       label_weight = sort(Weights, decreasing = TRUE, index = TRUE)
@@ -97,7 +98,7 @@ IMIS <- function(B0, B, B.re, number_k, D=0, fp, likdat,
                       ", time used=", round(ptm.use/60,2),
                       "minutes, convergence=", optNM$convergence))
           center_all <- rbind(center_all, optNM$par)
-          sigma_all[[i]] <- Sig2_global
+          sigma_all[[D*(k-1) + i]] <- Sig2_global
         } else {
           print(paste("maximum log posterior=", round(-optBFGS$value,2),
                       ", likelihood=", round(log(likelihood(optBFGS$par, fp, likdat)),2), 
@@ -107,10 +108,10 @@ IMIS <- function(B0, B, B.re, number_k, D=0, fp, likdat,
           center_all <- rbind(center_all, optBFGS$par)  # the center of new samples
           eig <- eigen(optBFGS$hessian)
           if (all(eig$values>0)){
-            sigma_all[[i]] = solve(optBFGS$hessian)  # the covariance of new samples
+            sigma_all[[D*(k-1) + i]] = solve(optBFGS$hessian)  # the covariance of new samples
           } else { # If the hessian matrix is not positive definite, we define the covariance as following
             eigval <- replace(eig$values, eig$values < 0, 0)
-            sigma_all[[i]] <- solve(eig$vectors %*% diag(eigval) %*% t(eig$vectors) + diag(1/diag(Sig2_global)) )
+            sigma_all[[D*(k-1) + i]] <- solve(eig$vectors %*% diag(eigval) %*% t(eig$vectors) + diag(1/diag(Sig2_global)) )
           }
         }
 
@@ -121,9 +122,8 @@ IMIS <- function(B0, B, B.re, number_k, D=0, fp, likdat,
         which_exclude <- union( which_exclude, which_remain[label_dist$ix[1:floor(size_remain/D)]])
         which_remain <- setdiff(which_remain, which_exclude)
 
-        X_k <- rbind(X_k, rmvnorm(B, center_all[i,], sigma_all[[i]]))
+        X_k <- rbind(X_k, rmvnorm(B, center_all[D*(k-1) + i,], sigma_all[[D*(k-1) + i]]))
       }
-      n_all <- B0
       X_all[n_all + 1:(B*D),] <- X_k
     } else {
   
@@ -142,7 +142,7 @@ IMIS <- function(B0, B, B.re, number_k, D=0, fp, likdat,
 
       n_all <- n_all + dim(X_k)[1]
       Sig2 <- cov.wt(X_all[which_var,], wt = weight_close+1/n_all, cor = FALSE, center = X_imp, method = "unbias")$cov
-      sigma_all[[D+k-1]] <- Sig2
+      sigma_all[[(D-1)*opt_iter+k]] <- Sig2
       X_k <- rmvnorm(B, X_imp, Sig2)                           # Draw new samples
       X_all[n_all + 1:B,] <- X_k
 

@@ -1,4 +1,4 @@
-fitmod <- function(obj, ..., B0 = 1e5, B = 1e4, B.re = 3000, number_k = 500, D=0,
+fitmod <- function(obj, ..., B0 = 1e5, B = 1e4, B.re = 3000, number_k = 500, D=0, opt_iter=0,
                    sample.prior=epp:::sample.prior,
                    prior=epp:::prior,
                    likelihood=epp:::likelihood){
@@ -11,11 +11,15 @@ fitmod <- function(obj, ..., B0 = 1e5, B = 1e4, B.re = 3000, number_k = 500, D=0
 
   ## If IMIS fails, start again
   fit <- try(stop(""), TRUE)
-  while(inherits(fit, "try-error")) 
-    fit <- try(IMIS(B0, B, B.re, number_k, D, fp=fp, likdat=likdat,
+  while(inherits(fit, "try-error")){
+    start.time <- proc.time()
+    fit <- try(IMIS(B0, B, B.re, number_k, D, opt_iter, fp=fp, likdat=likdat,
                     sample.prior=sample.prior, prior=prior, likelihood=likelihood))
+    fit.time <- proc.time() - start.time
+  }
   fit$fp <- fp
   fit$likdat <- likdat
+  fit$time <- fit.time
 
   class(fit) <- "eppfit"
 
