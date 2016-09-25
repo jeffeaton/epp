@@ -31,6 +31,9 @@ fnCreateEPPSubpops <- function(epp.input, epp.subpops, epp.data){
     epp.art$art15yr <- epp.art$art15yr * art.dist[subpop]
 
     epp.subpop.input[[subpop]]$epp.art <- epp.art
+
+    if(!is.null(attr(epp.subpops$subpops[[subpop]], "epidemic.start")))
+      epp.subpop.input[[subpop]]$epidemic.start <- attr(epp.subpops$subpops[[subpop]], "epidemic.start")
   }
 
   return(epp.subpop.input)
@@ -41,7 +44,7 @@ fnCreateEPPFixPar <- function(epp.input,
                               dt = 0.1,
                               proj.start = epp.input$start.year+dt*ceiling(1/(2*dt)),
                               proj.end = epp.input$stop.year+dt*ceiling(1/(2*dt)),
-                              tsEpidemicStart = proj.start,
+                              tsEpidemicStart = epp.input$epidemic.start+dt*ceiling(1/(2*dt)),
                               cd4stage.weights=c(1.3, 0.6, 0.1, 0.1, 0.0, 0.0, 0.0),
                               art1yr.weight = 0.1,
                               ancadj=TRUE, ancadj.yr=2016){
