@@ -30,13 +30,13 @@ IMIS <- function(B0, B, B.re, number_k, D=0, opt_iter=0, fp, likdat,
     
     if(k>=2){
       if(k <= (opt_iter+1)){
-        if(k > 2)
-          gaussian_sum[(n_pos+1):length(which_pos)] <- rowSums(sapply(1:(D*(k-2)), function(j)dmvnorm(X_all[which_pos[(n_pos+1):length(which_pos)],], center_all[j,], sigma_all[[j]])))
+        if(k > 2 && length(which_pos) > n_pos)
+          gaussian_sum[(n_pos+1):length(which_pos)] <- rowSums(matrix(sapply(1:(D*(k-2)), function(j)dmvnorm(X_all[which_pos[(n_pos+1):length(which_pos)],,drop=FALSE], center_all[j,], sigma_all[[j]])), nrow=length(which_pos)-n_pos))
         n_pos <- length(which_pos)
-        gaussian_sum[1:n_pos] <- gaussian_sum[1:n_pos] + rowSums(sapply(D*(k-2)+1:D, function(j) dmvnorm(X_all[which_pos,], center_all[j,], sigma_all[[j]])))
+        gaussian_sum[1:n_pos] <- gaussian_sum[1:n_pos] + rowSums(matrix(sapply(D*(k-2)+1:D, function(j) dmvnorm(X_all[which_pos,,drop=FALSE], center_all[j,], sigma_all[[j]])),nrow=n_pos))
       } else {
-        if(k > 2)
-          gaussian_sum[(n_pos+1):length(which_pos)] <- rowSums(sapply(1:((D-1)*opt_iter + k-2), function(j)dmvnorm(X_all[which_pos[(n_pos+1):length(which_pos)],], center_all[j,], sigma_all[[j]])))
+        if(k > 2 && length(which_pos) > n_pos)
+          gaussian_sum[(n_pos+1):length(which_pos)] <- rowSums(matrix(sapply(1:((D-1)*opt_iter + k-2), function(j)dmvnorm(X_all[which_pos[(n_pos+1):length(which_pos)],,drop=FALSE], center_all[j,], sigma_all[[j]])), nrow=length(which_pos)-n_pos))
         n_pos <- length(which_pos)
         gaussian_sum[1:n_pos] <- gaussian_sum[1:n_pos] + dmvnorm(X_all[which_pos,], center_all[(D-1)*opt_iter + k-1,], sigma_all[[(D-1)*opt_iter + k-1]])
       }
