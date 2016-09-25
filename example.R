@@ -12,40 +12,13 @@ setwd("~/Documents/Code/R/epp/")
 library(epp)
 
 
-## Function to do the following:
-## (1) Read data, EPP subpopulations, and popualation inputs
-## (2) Prepare timestep inputs for each EPP subpopulation
-
-prepare.epp.fit <- function(filepath, proj.end=2015.5){
-
-  ## epp
-  eppd <- read_epp_data(paste(filepath, ".xml", sep=""))
-  epp.subp <- read_epp_subpops(paste(filepath, ".xml", sep=""))
-  epp.input <- read_epp_input(filepath)
-
-  epp.subp.input <- fnCreateEPPSubpops(epp.input, epp.subp, eppd)
-
-  ## output
-  val <- setNames(vector("list", length(eppd)), names(eppd))
-
-  set.list.attr <- function(obj, attrib, value.lst)
-    mapply(function(set, value){ attributes(set)[[attrib]] <- value; set}, obj, value.lst)
-
-  val <- set.list.attr(val, "eppd", eppd)
-  val <- set.list.attr(val, "likdat", lapply(eppd, fnCreateLikDat, anchor.year=epp.input$start.year))
-  val <- set.list.attr(val, "eppfp", lapply(epp.subp.input, fnCreateEPPFixPar, proj.end = proj.end))
-  val <- set.list.attr(val, "country", attr(eppd, "country"))
-  val <- set.list.attr(val, "region", names(eppd))
-
-  return(val)
-}
-
-
 ## Read Botswana data and prepare fit (available for download: http://apps.unaids.org/spectrum/)
 
-bw.path <- "~/Documents/Data/Spectrum files/2014, final (downloaded 8 October 2014)/Botswana 2014/Botswana 2014_Nat 19_06_14-c"   
+## bw.path <- "~/Documents/Data/Spectrum files/2014, final (downloaded 8 October 2014)/Botswana 2014/Botswana 2014_Nat 19_06_14-c"
 
-bw.out <- prepare.epp.fit(bw.path, proj.end=2015.5)
+bw.path <- "~/Documents/Data/Spectrum files/2016 final/SSA/Botswana_ Final_15_04_ 2016 upd/Botswana_ Final_15_04_ 2016 upd"
+
+bw.out <- prepare_epp_fit(bw.path, proj.end=2015.5)
 
 
 #########################
