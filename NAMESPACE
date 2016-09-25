@@ -5,6 +5,8 @@ export(update.eppfp, prev, fnPregPrev, incid, prev.epp, incid.epp, ll, IMIS)
 export(read_epp_input, read_epp_data, read_epp_subpops)
 export(fitmod, simfit, prepare_epp_fit)
 
+export(prepare_rtpwcens_likdat)
+
 S3method(simmod, eppfp)
 S3method(simfit, eppfit)
 import(mvtnorm)
