@@ -155,5 +155,5 @@ IMIS <- function(B0, B, B.re, number_k, D=0, opt_iter=0, fp, likdat,
   which_X = sample(which_pos, B.re, replace = TRUE, prob = Weights)
   if (is.matrix(X_all)) resample_X = X_all[which_X,]
 
-  return(list(stat=t(stat_all), resample=resample_X, center=center_all))
+  return(list(stat=t(stat_all[,1:k]), resample=resample_X, center=center_all))
 } # end of IMIS
