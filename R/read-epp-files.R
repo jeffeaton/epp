@@ -3,10 +3,13 @@
 ####  Function to read inputs from Spectrum to EPP (.ep1, .ep3, .ep4)  ####
 ###########################################################################
 
-read_epp_input <- function(ep.path){
+read_epp_input <- function(pjnz){
 
   ## ep1
-  ep1 <- scan(paste0(ep.path, ".ep1"), "character", sep="\n")
+  ep1file <- grep(".ep1", unzip(pjnz, list=TRUE)$Name, value=TRUE)
+  con <- unz(pjnz, ep1file)
+  ep1 <- scan(con, "character", sep="\n")
+  close(con)
 
   country.idx <- which(sapply(ep1, substr, 1, 7) == "COUNTRY")
   firstprojyr.idx <-  which(sapply(ep1, substr, 1, 11) == "FIRSTPROJYR")
@@ -23,8 +26,11 @@ read_epp_input <- function(ep.path){
                       c("year", "pop15to49", "pop15", "pop50", "netmigr"))
 
   ## ep4
-  ep4 <- scan(paste0(ep.path, ".ep4"), "character", sep="\n")
-
+  ep4file <- grep(".ep4", unzip(pjnz, list=TRUE)$Name, value=TRUE)
+  con <- unz(pjnz, ep4file)
+  ep4 <- scan(con, "character", sep="\n")
+  close(con)
+  
   cd4lim.idx <- which(sapply(ep4, substr, 1, 12) == "CD4LOWLIMITS")
   lambda.idx <- which(sapply(ep4, substr, 1, 6) == "LAMBDA")
   cd4init.idx <- which(sapply(ep4, substr, 1, 13) == "NEWINFECTSCD4")
@@ -108,10 +114,15 @@ read_epp_input <- function(ep.path){
 
   ## XML (for epidemic start year)
 
+  xmlfile <- grep(".xml", unzip(pjnz, list=TRUE)$Name, value=TRUE)
+  con <- unz(pjnz, xmlfile)
+  epp.xml <- scan(con, "character", sep="\n")
+  close(con)
+
   if (!require("XML", quietly = TRUE))
     stop("read_epp_input() requires the package 'XML'. Please install it.", call. = FALSE)
       
-  obj <- xmlTreeParse(paste0(ep.path, ".xml"))
+  obj <- xmlTreeParse(epp.xml)
   r <- xmlRoot(obj)[[1]]
   epidemic.start <- as.integer(xmlToList(r[[which(xmlSApply(r, xmlAttrs) == "epidemicStartYrVarR")]][[1]]))
 
@@ -144,7 +155,12 @@ read_epp_input <- function(ep.path){
 ####  Function to read prevalence data used in EPP fitting (from .xml)  ####
 ############################################################################
 
-read_epp_data <- function(epp.xml){
+read_epp_data <- function(pjnz){
+
+  xmlfile <- grep(".xml", unzip(pjnz, list=TRUE)$Name, value=TRUE)
+  con <- unz(pjnz, xmlfile)
+  epp.xml <- scan(con, "character", sep="\n")
+  close(con)
 
   if (!require("XML", quietly = TRUE))
     stop("read_epp_data() requires the package 'XML'. Please install it.", call. = FALSE)
@@ -249,7 +265,12 @@ read_epp_data <- function(epp.xml){
 ####  Function to read subpopulation sizes used in EPP fitting (from .xml)  ####
 ################################################################################
 
-read_epp_subpops <- function(epp.xml){
+read_epp_subpops <- function(pjnz){
+
+  xmlfile <- grep(".xml", unzip(pjnz, list=TRUE)$Name, value=TRUE)
+  con <- unz(pjnz, xmlfile)
+  epp.xml <- scan(con, "character", sep="\n")
+  close(con)
 
   obj <- xmlTreeParse(epp.xml)
   r <- xmlRoot(obj)[[1]]
