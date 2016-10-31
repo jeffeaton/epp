@@ -66,6 +66,9 @@ simfit.eppfit <- function(fit, rwproj=FALSE){
   fit$rvec <- sapply(mod.list, attr, "rvec")
   fit$prev <- sapply(mod.list, prev)
   fit$incid <- mapply(incid, mod = mod.list, fp = fp.list)
+  fit$popsize <- sapply(mod.list, rowSums)
+  fit$pregprev <- mapply(fnPregPrev.epp, mod.list, fp.list)
+  
   return(fit)
 }
 
