@@ -78,12 +78,12 @@ simfit.eppfit <- function(fit, rwproj=FALSE){
 ## (1) Read data, EPP subpopulations, and popualation inputs
 ## (2) Prepare timestep inputs for each EPP subpopulation
 
-prepare_epp_fit <- function(filepath, proj.end=2015.5){
+prepare_epp_fit <- function(pjnz, proj.end=2015.5){
 
   ## epp
-  eppd <- read_epp_data(paste(filepath, ".xml", sep=""))
-  epp.subp <- read_epp_subpops(paste(filepath, ".xml", sep=""))
-  epp.input <- read_epp_input(filepath)
+  eppd <- read_epp_data(pjnz)
+  epp.subp <- read_epp_subpops(pjnz)
+  epp.input <- read_epp_input(pjnz)
 
   epp.subp.input <- fnCreateEPPSubpops(epp.input, epp.subp, eppd)
 
