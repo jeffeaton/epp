@@ -124,8 +124,12 @@ read_epp_input <- function(pjnz){
       
   obj <- xmlTreeParse(epp.xml)
   r <- xmlRoot(obj)[[1]]
-  epidemic.start <- as.integer(xmlToList(r[[which(xmlSApply(r, xmlAttrs) == "epidemicStartYrVarR")]][[1]]))
 
+  ## Note: tag "epidemicStartYrVarR" doesn't appear to change...
+  ## Use epidemic start from first EPP subpopulation fit
+  eppSetChildren.idx <- which(xmlSApply(r, xmlAttrs) == "eppSetChildren")
+  eppSet <- r[[eppSetChildren.idx]][[1]][[1]]
+  epidemic.start <- as.integer(xmlToList(eppSet[[which(xmlSApply(eppSet, xmlAttrs) == "priorT0vr")]][[1]]))
   
   eppin <- list(start.year       = start.year,
                 stop.year        = stop.year,
