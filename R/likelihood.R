@@ -186,9 +186,7 @@ calc.v.infl <- function(qM, anclik.dat, fp){
 ####  IMIS functions  ####
 ##########################
 
-## Note: requires fp and likdat to be in global environment
-
-sample.prior <- function(n){
+sample.prior <- function(n, fp){
 
   if(!exists("eppmod", where = fp))  # backward compatibility
     fp$eppmod <- "rspline"
@@ -233,10 +231,14 @@ sample.prior <- function(n){
   return(mat)
 }
 
-prior <- function(theta){
+prior <- function(theta, fp){
+  if(is.vector(theta))
+    return(exp(lprior(theta, fp)))
   return(unlist(lapply(seq_len(nrow(theta)), function(i) return(exp(lprior(theta[i,], fp))))))
 }
 
-likelihood <- function(theta){
+likelihood <- function(theta, fp, likdat){
+  if(is.vector(theta))
+    return(exp(ll(theta, fp, likdat)))
   return(unlist(lapply(seq_len(nrow(theta)), function(i) return(exp(ll(theta[i,], fp, likdat))))))
 }
