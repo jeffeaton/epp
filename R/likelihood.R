@@ -170,8 +170,8 @@ ll <- function(theta, fp, likdat){
 ## If v.infl is.null(), calculates v.infl according to function calc.vinfl
 
 calc.v.infl <- function(qM, anclik.dat, fp){
-  d.lst <- mapply(function(w, idx) w - qM[idx], anclik.dat$W.lst, anclik.dat$anc.idx.lst)
-  rss <- unlist(mapply("-", lapply(mapply("-", d.lst, lapply(d.lst, mean)), function(x) x*x), anclik.dat$v.lst))
+  d.lst <- mapply(function(w, idx) w - qM[idx], anclik.dat$W.lst, anclik.dat$anc.idx.lst, SIMPLIFY = FALSE)
+  rss <- unlist(mapply("-", lapply(mapply("-", d.lst, lapply(d.lst, mean), SIMPLIFY=FALSE), function(x) x*x), anclik.dat$v.lst, SIMPLIFY=FALSE))
 
   if(!is.null(fp$vinfl.method) && fp$vinfl.method=="unbiased")
     return(max(sum(rss), 0)/(length(rss) - length(d.lst)))
