@@ -30,6 +30,12 @@ lprior <- function(theta, fp){
   if(!exists("eppmod", where = fp))  # backward compatibility
     fp$eppmod <- "rspline"
 
+  if(exists("ancbias.pr.mean", where=fp))
+    ancbias.pr.mean <- fp$ancbias.pr.mean
+
+  if(exists("ancbias.pr.sd", where=fp))
+    ancbias.pr.sd <- fp$ancbias.pr.sd
+
   if(fp$eppmod == "rspline"){
     nk <- fp$numKnots
     tau2 <- exp(theta[nk+3])
@@ -190,6 +196,12 @@ sample.prior <- function(n, fp){
 
   if(!exists("eppmod", where = fp))  # backward compatibility
     fp$eppmod <- "rspline"
+
+  if(exists("ancbias.pr.mean", where=fp))
+    ancbias.pr.mean <- fp$ancbias.pr.mean
+  
+  if(exists("ancbias.pr.sd", where=fp))
+    ancbias.pr.sd <- fp$ancbias.pr.sd
   
   if(fp$eppmod == "rspline"){
     
