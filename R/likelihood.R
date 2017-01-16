@@ -25,36 +25,36 @@ logr0.unif.prior <- c(1/11.5, 10)
 rtrend.beta.pr.sd <- 0.2
 
 
-#####################################
-####                             ####
-####  RTPW likelihood functions  ####
-####                             ####
-#####################################
+######################################
+####                              ####
+####  ANCRT likelihood functions  ####
+####                              ####
+######################################
 
 ## prior parameters for PMTCT scenarios
-rtpwcens.bias.pr.mean <- 0
-rtpwcens.bias.sd <- 1.0
-rtpwcens.vinfl.pr.rate <- 1/0.015
+ancrtcens.bias.pr.mean <- 0
+ancrtcens.bias.pr.sd <- 1.0
+ancrtcens.vinfl.pr.rate <- 1/0.015
 
-rtpwsite.beta.pr.mean <- 0
-rtpwsite.beta.pr.sd <- 1.0
-rtpwsite.vinfl.pr.rate <- 1/0.015
+ancrtsite.beta.pr.mean <- 0
+ancrtsite.beta.pr.sd <- 1.0
+ancrtsite.vinfl.pr.rate <- 1/0.015
 
-prepare_rtpwcens_likdat <- function(dat, fp){
+prepare_ancrtcens_likdat <- function(dat, fp){
   anchor.year <- floor(min(fp$proj.steps))
 
-  x.rtpw <- (dat$prev*dat$n+0.5)/(dat$n+1)
-  dat$W.rtpw <- qnorm(x.rtpw)
-  dat$v.rtpw <- 2*pi*exp(dat$W.rtpw^2)*x.rtpw*(1-x.rtpw)/dat$n
+  x.ancrt <- (dat$prev*dat$n+0.5)/(dat$n+1)
+  dat$W.ancrt <- qnorm(x.ancrt)
+  dat$v.ancrt <- 2*pi*exp(dat$W.ancrt^2)*x.ancrt*(1-x.ancrt)/dat$n
   dat$idx <- dat$year - anchor.year+1
 
   return(dat)
 }
 
-ll_rtpwcens <- function(qM.preg, rtpwcens.dat, fp){
-  sum(dnorm(rtpwcens.dat$W.rtpw,
-            qM.preg[rtpwcens.dat$idx] + fp$rtpwcens.bias,
-            sqrt(rtpwcens.dat$v.rtpw + fp$rtpwcens.vinfl), log=TRUE))
+ll_ancrtcens <- function(qM.preg, ancrtcens.dat, fp){
+  sum(dnorm(ancrtcens.dat$W.ancrt,
+            qM.preg[ancrtcens.dat$idx] + fp$ancrtcens.bias,
+            sqrt(ancrtcens.dat$v.ancrt + fp$ancrtcens.vinfl), log=TRUE))
 }
   
 
@@ -82,16 +82,16 @@ lprior <- function(theta, fp){
       dexp(exp(theta[9]), vinfl.prior.rate, TRUE) + theta[9]   # additional ANC variance
   }
   
-  if(exists("rtpw", fp) && fp$rtpw=="cens"){
+  if(exists("ancrt", fp) && fp$ancrt=="census"){
     np <- length(theta)
     lpr <- lpr +
-      dnorm(theta[np-1], rtpwcens.bias.pr.mean, rtpwcens.bias.pr.sd, log=TRUE) +
-      dexp(exp(theta[np]), rtpwcens.vinfl.pr.rate, TRUE) + theta[np]
-  } else if(exists("rtpw", fp) && fp$rtpw=="cens"){
+      dnorm(theta[np-1], ancrtcens.bias.pr.mean, ancrtcens.bias.pr.sd, log=TRUE) +
+      dexp(exp(theta[np]), ancrtcens.vinfl.pr.rate, TRUE) + theta[np]
+  } else if(exists("ancrt", fp) && fp$ancrt=="census"){
     np <- length(theta)
     lpr <- lpr +
-      dnorm(theta[np-1], rtpwsite.bias.pr.mean, rtpwsite.bias.pr.sd, log=TRUE) +
-      dexp(exp(theta[np]), rtpwsite.vinfl.pr.rate, TRUE) + theta[np]
+      dnorm(theta[np-1], ancrtsite.bias.pr.mean, ancrtsite.bias.pr.sd, log=TRUE) +
+      dexp(exp(theta[np]), ancrtsite.vinfl.pr.rate, TRUE) + theta[np]
   }
 
   return(lpr)
@@ -161,12 +161,12 @@ fnCreateParam <- function(theta, fp){
 
   ## !! Assumes only 'census' or 'site data
   ## NOT a necessary assumption, overhaul this later
-  if(exists("rtpw", fp) && fp$rtpw == "census"){
-    param$rtpwcens.bias <- theta[length(theta)-1]
-    param$rtpwcens.vinfl <- exp(theta[length(theta)])
-  } else if(exists("rtpw", fp) && fp$rtpw == "site"){
-    param$rtpwsite.beta <- theta[length(theta)-1]
-    param$rtpwsite.vinfl <- exp(theta[length(theta)])
+  if(exists("ancrt", fp) && fp$ancrt == "census"){
+    param$ancrtcens.bias <- theta[length(theta)-1]
+    param$ancrtcens.vinfl <- exp(theta[length(theta)])
+  } else if(exists("ancrt", fp) && fp$ancrt == "site"){
+    param$ancrtsite.beta <- theta[length(theta)-1]
+    param$ancrtsite.vinfl <- exp(theta[length(theta)])
   }
 
   return(param)
@@ -192,10 +192,10 @@ ll <- function(theta, fp, likdat){
   ll.anc <- log(anclik::fnANClik(qM.preg+fp$ancbias, likdat$anclik.dat, fp$v.infl))
   ll.hhs <- fnHHSll(qM.all, likdat$hhslik.dat)
 
-  if(exists("rtpw", fp) && fp$rtpw == "census")
-    ll.rtpw <- ll_rtpwcens(qM.preg, likdat$rtpwcens.dat, fp)
+  if(exists("ancrt", fp) && fp$ancrt == "census")
+    ll.ancrt <- ll_ancrtcens(qM.preg, likdat$ancrtcens.dat, fp)
   else
-    ll.rtpw <- 0
+    ll.ancrt <- 0
 
   if(exists("equil.rprior", where=fp) && fp$equil.rprior){
     rvec.ann <- fp$rvec[fp$proj.steps %% 1 == 0.5]
@@ -205,7 +205,7 @@ ll <- function(theta, fp, likdat){
   } else
     ll.rprior <- 0
   
-  return(ll.anc+ll.hhs+ll.rtpw+ll.rprior)
+  return(ll.anc+ll.hhs+ll.ancrt+ll.rprior)
 }
 
 
@@ -219,7 +219,7 @@ sample.prior <- function(n, fp){
     fp$eppmod <- "rspline"
 
   nparam <- if(fp$eppmod == "rspline") fp$numKnots+4 else 9
-  if(exists("rtpw", where=fp) && fp$rtpw %in% c("census", "site"))
+  if(exists("ancrt", where=fp) && fp$ancrt %in% c("census", "site"))
      nparam <- nparam+2
 
   mat <- matrix(NA, n, nparam)
@@ -246,12 +246,12 @@ sample.prior <- function(n, fp){
     mat[,9] <- log(rexp(n, vinfl.prior.rate))                      # v.infl
   }
 
-  if(exists("rtpw", where=fp) && fp$rtpw == "census"){
-    mat[,nparam-1] <- rnorm(n, rtpwcens.bias.pr.mean, rtpwcens.bias.sd)
-    mat[,nparam] <- log(rexp(n, rtpwcens.vinfl.pr.rate))
-  } else if(exists("rtpw", where=fp) && fp$rtpw == "site"){
-    mat[,nparam-1] <- rnorm(n, rtpwsite.beta.pr.mean, rtpwsite.beta.sd)
-    mat[,nparam] <- log(rexp(n, rtpwsite.vinfl.pr.rate))
+  if(exists("ancrt", where=fp) && fp$ancrt == "census"){
+    mat[,nparam-1] <- rnorm(n, ancrtcens.bias.pr.mean, ancrtcens.bias.pr.sd)
+    mat[,nparam] <- log(rexp(n, ancrtcens.vinfl.pr.rate))
+  } else if(exists("ancrt", where=fp) && fp$ancrt == "site"){
+    mat[,nparam-1] <- rnorm(n, ancrtsite.beta.pr.mean, ancrtsite.beta.sd)
+    mat[,nparam] <- log(rexp(n, ancrtsite.vinfl.pr.rate))
   }
 
   return(mat)
