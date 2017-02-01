@@ -9,5 +9,8 @@ export(prepare_ancrtcens_likdat)
 
 S3method(simmod, eppfp)
 S3method(simfit, eppfit)
+S3method(fnPregPrev, epp)
+S3method(prev, epp)
+S3method(incid, epp)
 import(mvtnorm)
 useDynLib(epp, eppC)

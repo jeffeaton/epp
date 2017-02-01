@@ -11,11 +11,11 @@ read_epp_input <- function(pjnz){
   ep1 <- scan(con, "character", sep="\n")
   close(con)
 
-  country.idx <- which(sapply(ep1, substr, 1, 7) == "COUNTRY")
+  country.idx <- grep("COUNTRY", ep1)
   firstprojyr.idx <-  which(sapply(ep1, substr, 1, 11) == "FIRSTPROJYR")
   lastprojyr.idx <-  which(sapply(ep1, substr, 1, 10) == "LASTPROJYR")
-  popstart.idx <- which(ep1 == "POPSTART")+1
-  popend.idx <- which(ep1 == "POPEND")-1
+  popstart.idx <- grep("POPSTART", ep1)+1
+  popend.idx <- grep("POPEND", ep1)-1
 
   country <- as.character(read.csv(text=ep1[country.idx], header=FALSE, as.is=TRUE)[2])
   country.code <- as.integer(read.csv(text=ep1[country.idx], header=FALSE)[3])
@@ -39,28 +39,29 @@ read_epp_input <- function(pjnz){
   alpha2.idx <- which(sapply(ep4, substr, 1, 6) == "ALPHA2")
   alpha3.idx <- which(sapply(ep4, substr, 1, 6) == "ALPHA3")
   infectreduc.idx <- which(sapply(ep4, substr, 1, 11) == "INFECTREDUC")
-  artstart.idx <- which(ep4 == "ARTSTART")+1
-  artend.idx <- which(ep4 == "ARTEND")-1
+  artstart.idx <- grep("ARTSTART", ep4)+1
+  artend.idx <- grep("ARTEND", ep4)-1
 
-  cd4lim <- as.integer(read.csv(text=ep4[cd4lim.idx], header=FALSE)[-1])
-  cd4init <- as.matrix(read.csv(text=ep4[cd4init.idx], header=FALSE, row.names=1))
-  lambda <- as.matrix(read.csv(text=ep4[lambda.idx], header=FALSE, row.names=1))
-  mu <- as.matrix(read.csv(text=ep4[mu.idx], header=FALSE, row.names=1))
-  alpha1 <- as.matrix(read.csv(text=ep4[alpha1.idx], header=FALSE, row.names=1))
-  alpha2 <- as.matrix(read.csv(text=ep4[alpha2.idx], header=FALSE, row.names=1))
-  alpha3 <- as.matrix(read.csv(text=ep4[alpha3.idx], header=FALSE, row.names=1))
+  DS <- 7 # disease stages
+
+  cd4lim <- as.integer(read.csv(text=ep4[cd4lim.idx], header=FALSE)[-1][1:DS])
+  cd4init <- as.matrix(read.csv(text=ep4[cd4init.idx], header=FALSE, row.names=1)[,1:DS])
+  lambda <- as.matrix(read.csv(text=ep4[lambda.idx], header=FALSE, row.names=1)[,1:(DS-1)])
+  mu <- as.matrix(read.csv(text=ep4[mu.idx], header=FALSE, row.names=1)[,1:DS])
+  alpha1 <- as.matrix(read.csv(text=ep4[alpha1.idx], header=FALSE, row.names=1)[,1:DS])
+  alpha2 <- as.matrix(read.csv(text=ep4[alpha2.idx], header=FALSE, row.names=1)[,1:DS])
+  alpha3 <- as.matrix(read.csv(text=ep4[alpha3.idx], header=FALSE, row.names=1)[,1:DS])
   infectreduc <- as.numeric(read.csv(text=ep4[infectreduc.idx], header=FALSE)[2])
 
   epp.art <- setNames(read.csv(text=ep4[artstart.idx:artend.idx], header=FALSE, as.is=TRUE),
                       c("year", "m.isperc", "m.val", "f.isperc", "f.val", "cd4thresh", "m.perc50plus", "f.perc50plus", "perc50plus", "1stto2ndline"))
 
   specpop.idx <- grep("SPECPOP", ep4)
-  art.specpop <- read.csv(text=ep4[specpop.idx], header=FALSE,
-                          colClasses=c("NULL", "character", "numeric", "integer"),
-                          col.names=c(NA, "specpop", "percelig", "yearelig"))
+  art.specpop <- setNames(read.csv(text=ep4[specpop.idx], header=FALSE,
+                                   colClasses=c("NULL", "character", "numeric", "integer"))[,1:3],
+                          c("specpop", "percelig", "yearelig"))
   art.specpop$percelig <- art.specpop$percelig/100
   
-
   cd4median.start.idx <- which(ep4 == "CD4MEDIAN_START")+1
   cd4median.end.idx <- which(ep4 == "CD4MEDIAN_END")-1
   if(length(cd4median.start.idx) > 0)
