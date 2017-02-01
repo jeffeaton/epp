@@ -22,6 +22,7 @@ vinfl.prior.rate <- 1/0.015
 t0.unif.prior <- c(1970, 1990)
 t1.unif.prior <- c(10, 30)
 logr0.unif.prior <- c(1/11.5, 10)
+rtrend.beta.pr.mean <- 0.0
 rtrend.beta.pr.sd <- 0.2
 
 
@@ -63,6 +64,11 @@ lprior <- function(theta, fp){
   if(!exists("eppmod", where = fp))  # backward compatibility
     fp$eppmod <- "rspline"
 
+  if(exists("prior_args", where = fp)){
+    for(i in seq_along(fp$prior_args))
+      assign(names(fp$prior_args)[i], fp$prior_args[[i]])
+  }
+
   if(fp$eppmod == "rspline"){
     nk <- fp$numKnots
     tau2 <- exp(theta[nk+3])
@@ -77,7 +83,7 @@ lprior <- function(theta, fp){
     lpr <- dunif(theta[1], t0.unif.prior[1], t0.unif.prior[2], log=TRUE) +
       dunif(theta[2], t1.unif.prior[1], t1.unif.prior[2], log=TRUE) +
       dunif(theta[3], logr0.unif.prior[1], logr0.unif.prior[2], log=TRUE) +
-      sum(dnorm(theta[4:7], 0, rtrend.beta.pr.sd, log=TRUE)) +
+      sum(dnorm(theta[4:7], rtrend.beta.pr.mean, rtrend.beta.pr.sd, log=TRUE)) +
       dnorm(theta[8], ancbias.pr.mean, ancbias.pr.sd, log=TRUE) +
       dexp(exp(theta[9]), vinfl.prior.rate, TRUE) + theta[9]   # additional ANC variance
   }
@@ -218,6 +224,11 @@ sample.prior <- function(n, fp){
   if(!exists("eppmod", where = fp))  # backward compatibility
     fp$eppmod <- "rspline"
 
+  if(exists("prior_args", where = fp)){
+    for(i in seq_along(fp$prior_args))
+      assign(names(fp$prior_args)[i], fp$prior_args[[i]])
+  }
+  
   nparam <- if(fp$eppmod == "rspline") fp$numKnots+4 else 9
   if(exists("ancrt", where=fp) && fp$ancrt %in% c("census", "site"))
      nparam <- nparam+2
@@ -241,7 +252,7 @@ sample.prior <- function(n, fp){
     mat[,1] <- runif(n, t0.unif.prior[1], t0.unif.prior[2])        # t0
     mat[,2] <- runif(n, t1.unif.prior[1], t1.unif.prior[2])        # t1
     mat[,3] <- runif(n, logr0.unif.prior[1], logr0.unif.prior[2])  # r0
-    mat[,4:7] <- rnorm(4*n, 0, rtrend.beta.pr.sd)                  # beta
+    mat[,4:7] <- t(matrix(rnorm(4*n, rtrend.beta.pr.mean, rtrend.beta.pr.sd), 4, n))  # beta
     mat[,8] <- rnorm(n, ancbias.pr.mean, ancbias.pr.sd)            # ancbias parameter
     mat[,9] <- log(rexp(n, vinfl.prior.rate))                      # v.infl
   }
