@@ -340,6 +340,60 @@ read_epp_subpops <- function(pjnz){
 }
 
 
+#####################################################
+####  Read EPP prevalence and incidence outputs  ####
+#####################################################
+
+read_spt <- function(pjnz){
+
+  sptfile <- grep("\\.SPT$", unzip(pjnz, list=TRUE)$Name, value=TRUE)
+  con <- unz(pjnz, sptfile)
+  spt <- scan(con, "character", sep="\n")
+  close(con)
+
+  break.rows <- which(spt == "==")
+ sub.break.rows <- which(spt == "=")
+ n.years <- sub.break.rows[2] - break.rows[1] - 3
+ regions <- sapply(strsplit(as.character(spt[break.rows+1]), "\\\\"), function(x) strsplit(x[2], ":")[[1]][1])[-length(break.rows)]
+ regions[is.na(regions)] <- "National"
+
+ out <- lapply(sub.break.rows[-1], 
+               function(idx){
+                 dat <- spt[idx-n.years:1]
+                 mat <- data.frame(t(sapply(strsplit(dat, ","), as.numeric)), row.names=1)
+                 mat[,1:2] <- mat[,1:2]/100
+                 names(mat) <- c("prev", "incid", "pop")[1:ncol(mat)]
+                 return(mat)
+               })
+
+ names(out) <- regions
+ return(out)
+}
+
+read_spu <- function(pjnz){
+
+  spufile <- grep("\\.SPU$", unzip(pjnz, list=TRUE)$Name, value=TRUE)
+  spu <- read.csv(unz(pjnz, spufile), header=FALSE)
+
+  n.resamp <- as.numeric(strsplit(as.character(spu[1,1]), " ")[[1]][3])
+  break.rows <- which(spu[,1] == "==")
+  n.years <- break.rows[2] - break.rows[1] - 2
+  count <- sapply(strsplit(as.character(spu[break.rows[-1]-(n.years+1),1]), " "), function(x) as.numeric(x[2]))
+  
+  years <- as.numeric(as.character(spu[break.rows[1]-n.years:1,1]))
+  
+  incid <- sapply(break.rows[-1], function(idx) spu[idx-n.years:1,3])[,rep(1:length(count), count)]/100
+  prev <- sapply(break.rows[-1], function(idx) spu[idx-n.years:1,2])[,rep(1:length(count), count)]/100
+
+  rownames(incid) <- years
+  rownames(prev) <- years
+
+  return(list("incid"=incid, "prev"=prev))
+}
+
+
+
+
 ###################
 ####  Example  ####
 ###################
