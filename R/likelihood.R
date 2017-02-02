@@ -20,11 +20,16 @@ vinfl.prior.rate <- 1/0.015
 
 ## r-trend prior parameters
 t0.unif.prior <- c(1970, 1990)
-t1.unif.prior <- c(10, 30)
-logr0.unif.prior <- c(1/11.5, 10)
-rtrend.beta.pr.mean <- 0.0
-rtrend.beta.pr.sd <- 0.2
-
+## t1.unif.prior <- c(10, 30)
+## logr0.unif.prior <- c(1/11.5, 10)
+t1.pr.mean <- 20.0
+t1.pr.sd <- 4.5
+logr0.pr.mean <- 0.42
+logr0.pr.sd <- 0.23
+## rtrend.beta.pr.mean <- 0.0
+## rtrend.beta.pr.sd <- 0.2
+rtrend.beta.pr.mean <- c(0.17, 0.46, -0.68, -0.038)
+rtrend.beta.pr.sd <- c(0.07, 0.12, 0.24, 0.009)
 
 ######################################
 ####                              ####
@@ -77,15 +82,19 @@ lprior <- function(theta, fp){
       dunif(theta[nk+1], logiota.unif.prior[1], logiota.unif.prior[2], log=TRUE) + 
       dnorm(theta[nk+2], ancbias.pr.mean, ancbias.pr.sd, log=TRUE) +
       ldinvgamma(tau2, invGammaParameter, invGammaParameter) + log(tau2) +  # + log(tau2): multiply likelihood by jacobian of exponential transformation
-      dexp(exp(theta[nk+4]), vinfl.prior.rate, TRUE) + theta[nk+4]         # additional ANC variance
+      ## dexp(exp(theta[nk+4]), vinfl.prior.rate, TRUE) + theta[nk+4]         # additional ANC variance
+      dexp(theta[nk+4], vinfl.prior.rate, TRUE)                               # additional ANC variance
   } else { # rtrend
 
     lpr <- dunif(theta[1], t0.unif.prior[1], t0.unif.prior[2], log=TRUE) +
-      dunif(theta[2], t1.unif.prior[1], t1.unif.prior[2], log=TRUE) +
-      dunif(theta[3], logr0.unif.prior[1], logr0.unif.prior[2], log=TRUE) +
+      ## dunif(theta[2], t1.unif.prior[1], t1.unif.prior[2], log=TRUE) +
+      dnorm(round(theta[2]), t1.pr.mean, t1.pr.sd, log=TRUE) +
+      ## dunif(theta[3], logr0.unif.prior[1], logr0.unif.prior[2], log=TRUE) +
+      dnorm(theta[3], logr0.pr.mean, logr0.pr.sd, log=TRUE) +
       sum(dnorm(theta[4:7], rtrend.beta.pr.mean, rtrend.beta.pr.sd, log=TRUE)) +
       dnorm(theta[8], ancbias.pr.mean, ancbias.pr.sd, log=TRUE) +
-      dexp(exp(theta[9]), vinfl.prior.rate, TRUE) + theta[9]   # additional ANC variance
+      ## dexp(exp(theta[9]), vinfl.prior.rate, TRUE) + theta[9]   # additional ANC variance
+      dexp(theta[9], vinfl.prior.rate, TRUE)                      # additional ANC variance
   }
   
   if(exists("ancrt", fp) && fp$ancrt=="census"){
@@ -155,14 +164,16 @@ fnCreateParam <- function(theta, fp){
     param <- list(rvec = as.vector(fp$rvec.spldes %*% beta),
                   iota = exp(theta[fp$numKnots+1]),
                   ancbias = theta[fp$numKnots+2],
-                  v.infl = exp(theta[fp$numKnots+4]))
+                  ## v.infl = exp(theta[fp$numKnots+4]))
+                  v.infl = theta[fp$numKnots+4])
   } else { # rtrend
-    param <- list(tsEpidemicStart = fp$proj.steps[which.min(abs(fp$proj.steps - theta[1]))], # t0
-                  rtrend = list(tStabilize = theta[1]+theta[2],  # t0 + t1
+    param <- list(tsEpidemicStart = fp$proj.steps[which.min(abs(fp$proj.steps - (round(theta[1]-0.5)+0.5)))], # t0
+                  rtrend = list(tStabilize = round(theta[1]-0.5)+0.5+round(theta[2]),  # t0 + t1
                                 r0 = exp(theta[3]),              # r0
                                 beta = theta[4:7]),
                   ancbias = theta[8],
-                  v.infl = exp(theta[9]))
+                  ## v.infl = exp(theta[9]))
+                  v.infl = theta[9])
   }
 
   ## !! Assumes only 'census' or 'site data
@@ -245,16 +256,20 @@ sample.prior <- function(n, fp){
     mat[,fp$numKnots+1] <-  runif(n, logiota.unif.prior[1], logiota.unif.prior[2])  # iota
     mat[,fp$numKnots+2] <-  rnorm(n, ancbias.pr.mean, ancbias.pr.sd)                # ancbias parameter
     mat[,fp$numKnots+3] <- log(tau2)                                                # tau2
-    mat[,fp$numKnots+4] <- log(rexp(n, vinfl.prior.rate))                           # v.infl
+    ## mat[,fp$numKnots+4] <- log(rexp(n, vinfl.prior.rate))                           # v.infl
+    mat[,fp$numKnots+4] <- rexp(n, vinfl.prior.rate)                                # v.infl
 
   } else { # r-trend
 
     mat[,1] <- runif(n, t0.unif.prior[1], t0.unif.prior[2])        # t0
-    mat[,2] <- runif(n, t1.unif.prior[1], t1.unif.prior[2])        # t1
-    mat[,3] <- runif(n, logr0.unif.prior[1], logr0.unif.prior[2])  # r0
+    ## mat[,2] <- runif(n, t1.unif.prior[1], t1.unif.prior[2])        # t1
+    mat[,2] <- rnorm(n, t1.pr.mean, t1.pr.sd)
+    ## mat[,3] <- runif(n, logr0.unif.prior[1], logr0.unif.prior[2])  # r0
+    mat[,3] <- rnorm(n, logr0.pr.mean, logr0.pr.sd)  # r0
     mat[,4:7] <- t(matrix(rnorm(4*n, rtrend.beta.pr.mean, rtrend.beta.pr.sd), 4, n))  # beta
     mat[,8] <- rnorm(n, ancbias.pr.mean, ancbias.pr.sd)            # ancbias parameter
-    mat[,9] <- log(rexp(n, vinfl.prior.rate))                      # v.infl
+    ## mat[,9] <- log(rexp(n, vinfl.prior.rate))                      # v.infl
+    mat[,9] <- rexp(n, vinfl.prior.rate)                              # v.infl
   }
 
   if(exists("ancrt", where=fp) && fp$ancrt == "census"){
