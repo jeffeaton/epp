@@ -175,9 +175,11 @@ read_epp_data <- function(pjnz){
   r <- xmlRoot(obj)[[1]]
   eppSetChildren.idx <- which(xmlSApply(r, xmlAttrs) == "eppSetChildren")
   country <- xmlToList(r[[which(xmlSApply(r, xmlAttrs) == "worksetCountry")]][[1]])
+  country_code <- xmlToList(r[[which(xmlSApply(r, xmlAttrs) == "countryCode")]][[1]])
 
   epp.data <- list() # declare list to store output
   attr(epp.data, "country") <- country
+  attr(epp.data, "country_code") <- country_code
 
   for(eppSet.idx in 1:xmlSize(r[[eppSetChildren.idx]])){
 
@@ -281,9 +283,11 @@ read_epp_subpops <- function(pjnz){
   r <- xmlRoot(obj)[[1]]
   eppSetChildren.idx <- which(xmlSApply(r, xmlAttrs) == "eppSetChildren")
   country <- xmlToList(r[[which(xmlSApply(r, xmlAttrs) == "worksetCountry")]][[1]])
+  country_code <- xmlToList(r[[which(xmlSApply(r, xmlAttrs) == "countryCode")]][[1]])
 
   epp.pops <- list() # declare list to store output
   attr(epp.pops, "country") <- country
+  attr(epp.pops, "country_code") <- country_code
 
   workset.startyear <- as.integer(xmlToList(r[[which(xmlSApply(r, xmlAttrs) == "worksetStartYear")]][[1]]))
   workset.endyear <- as.integer(xmlToList(r[[which(xmlSApply(r, xmlAttrs) == "worksetEndYear")]][[1]]))
