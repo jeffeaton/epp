@@ -193,6 +193,7 @@ read_epp_data <- function(pjnz){
     survData.idx <- which(xmlSApply(eppSet, xmlAttrs) == "survData")
     survSampleSizes.idx <- which(xmlSApply(eppSet, xmlAttrs) == "survSampleSizes")
 
+
     siteNames <- xmlSApply(eppSet[[siteNames.idx]][[1]], xmlSApply, xmlToList, FALSE)
     siteIdx <- as.numeric(xmlSApply(eppSet[[siteNames.idx]][[1]], xmlAttrs)) ## 0 based
 
@@ -230,6 +231,63 @@ read_epp_data <- function(pjnz){
     anc.n[anc.n == -1] <- NA
 
 
+    ## ANC-RT site level
+
+    pmtctdata.idx <- which(xmlSApply(eppSet, xmlAttrs) == "PMTCTData")
+    pmtctsitesamplesizes.idx <- which(xmlSApply(eppSet, xmlAttrs) == "PMTCTSiteSampleSizes")
+
+    if(length(pmtctdata.idx)){
+      ancrtsite.prev <- matrix(NA, nsites, nANCyears, dimnames=list(siteNames, 1985+0:(nANCyears-1)))
+      for(clinic.idx in 1:nsites){
+        clinic <- eppSet[[pmtctdata.idx]][["array"]][[clinic.idx]][[1]]
+        prev <- as.numeric(xmlSApply(clinic, xmlSApply, xmlToList, FALSE))
+        idx <- as.integer(xmlSApply(clinic, xmlAttrs)) + 1
+        ancrtsite.prev[clinic.idx, idx] <- prev
+      }
+      ancrtsite.prev[is.na(ancrtsite.prev)] <- 0.0 
+      ancrtsite.prev[ancrtsite.prev == -1] <- NA
+      ancrtsite.prev <- ancrtsite.prev/100
+
+      ancrtsite.n <- matrix(NA, nsites, nANCyears, dimnames=list(siteNames, 1985+0:(nANCyears-1)))
+      for(clinic.idx in 1:nsites){
+        clinic <- eppSet[[pmtctsitesamplesizes.idx]][["array"]][[clinic.idx]][[1]]
+        n <- as.numeric(xmlSApply(clinic, xmlSApply, xmlToList, FALSE))
+        idx <- as.integer(xmlSApply(clinic, xmlAttrs)) + 1
+        ancrtsite.n[clinic.idx, idx] <- n
+      }
+      ancrtsite.n[ancrtsite.n == -1] <- NA
+    } else {
+      ancrtsite.prev <- NULL
+      ancrtsite.n <- NULL
+    }
+      
+    
+    ## ANC-RT census level
+
+    pmtctcensdata.idx <- which(xmlSApply(eppSet, xmlAttrs) == "censusPMTCTSurvData")
+    pmtctcenssamplesizes.idx <- which(xmlSApply(eppSet, xmlAttrs) == "censusPMTCTSampleSizes")
+
+    if(length(pmtctcensdata.idx)){
+      ancrtcens.prev <- setNames(numeric(nANCyears), 1985+0:(nANCyears-1))
+      obj <- eppSet[[pmtctcensdata.idx]][[1]]
+      idx <- as.integer(xmlSApply(obj, xmlAttrs)) + 1
+      ancrtcens.prev[idx] <- as.numeric(xmlSApply(obj, xmlSApply, xmlToList, FALSE))
+      ancrtcens.prev[is.na(ancrtcens.prev)] <- 0.0 
+      ancrtcens.prev[ancrtcens.prev == -1] <- NA
+      ancrtcens.prev <- ancrtcens.prev/100
+
+      ancrtcens.n <- setNames(numeric(nANCyears), 1985+0:(nANCyears-1))
+      obj <- eppSet[[pmtctcenssamplesizes.idx]][[1]]
+      idx <- as.integer(xmlSApply(obj, xmlAttrs)) + 1
+      ancrtcens.n[idx] <- as.numeric(xmlSApply(obj, xmlSApply, xmlToList, FALSE))
+      ancrtcens.n[is.na(ancrtcens.n)] <- 0.0 
+      ancrtcens.n[ancrtcens.n == -1] <- NA
+    } else {
+      ancrtcens.prev <- NULL
+      ancrtcens.n <- NULL
+    }
+
+    
     ##  HH surveys  ##
 
     hhsUsed.idx <- which(xmlSApply(eppSet, xmlAttrs) == "surveyIsUsed")
@@ -259,6 +317,10 @@ read_epp_data <- function(pjnz){
                                 anc.used=anc.used,
                                 anc.prev=anc.prev,
                                 anc.n=anc.n,
+                                ancrtsite.prev=ancrtsite.prev,
+                                ancrtsite.n=ancrtsite.n,
+                                ancrtcens.prev=ancrtcens.prev,
+                                ancrtcens.n=ancrtcens.n,
                                 hhs=hhs)
   }
 
