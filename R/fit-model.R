@@ -5,9 +5,21 @@ fitmod <- function(obj, ..., B0 = 1e5, B = 1e4, B.re = 3000, number_k = 500, D=0
 
   ## ... : updates to fixed parameters (fp) object to specify fitting options
 
-  likdat <- attr(obj, 'likdat')  # put in global environment for IMIS functions.
   fp <- attr(obj, 'eppfp')
   fp <- update(fp, ...)
+
+  likdat <- attr(obj, 'likdat')
+
+  if(!exists("rtpw", fp) || fp$rtpw != "census")
+    likdat$rtpwcens.dat <- NULL
+
+  likdat$lastdata.idx <- max(unlist(likdat$anclik.dat$anc.idx.lst),
+                             likdat$hhslik.dat$idx,
+                             likdat$rtpwcens.dat$idx)
+  likdat$firstdata.idx <- min(unlist(likdat$anclik.dat$anc.idx.lst),
+                              likdat$hhslik.dat$idx,
+                              likdat$rtpwcens.dat$idx)
+  
 
   ## If IMIS fails, start again
   fit <- try(stop(""), TRUE)

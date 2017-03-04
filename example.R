@@ -16,7 +16,7 @@ library(epp)
 
 ## bw.path <- "~/Documents/Data/Spectrum files/2014, final (downloaded 8 October 2014)/Botswana 2014/Botswana 2014_Nat 19_06_14-c"
 
-bw.path <- "~/Documents/Data/Spectrum files/2016 final/SSA/Botswana_ Final_15_04_ 2016 upd/Botswana_ Final_15_04_ 2016 upd"
+bw.path <- "~/Documents/Data/Spectrum files/2016 final/SSA/Botswana_ Final_15_04_ 2016 upd.PJNZ"
 
 bw.out <- prepare_epp_fit(bw.path, proj.end=2015.5)
 

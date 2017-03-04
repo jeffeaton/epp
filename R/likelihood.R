@@ -16,39 +16,59 @@ muSS <- 1/11.5               #1/duration for r steady state prior
 
 ancbias.pr.mean <- 0.15
 ancbias.pr.sd <- 1.0
+vinfl.prior.rate <- 1/0.015
 
 ## r-trend prior parameters
 t0.unif.prior <- c(1970, 1990)
-t1.unif.prior <- c(10, 30)
-logr0.unif.prior <- c(1/11.5, 10)
-rtrend.beta.pr.sd <- 0.2
+## t1.unif.prior <- c(10, 30)
+## logr0.unif.prior <- c(1/11.5, 10)
+t1.pr.mean <- 20.0
+t1.pr.sd <- 4.5
+logr0.pr.mean <- 0.42
+logr0.pr.sd <- 0.23
+## rtrend.beta.pr.mean <- 0.0
+## rtrend.beta.pr.sd <- 0.2
+rtrend.beta.pr.mean <- c(0.46, 0.17, -0.68, -0.038)
+rtrend.beta.pr.sd <- c(0.12, 0.07, 0.24, 0.009)
 
-vinfl.prior.rate <- 1/0.015
-  
 
 lprior <- function(theta, fp){
 
   if(!exists("eppmod", where = fp))  # backward compatibility
     fp$eppmod <- "rspline"
 
+  if(exists("prior_args", where = fp)){
+    for(i in seq_along(fp$prior_args))
+      assign(names(fp$prior_args)[i], fp$prior_args[[i]])
+  }
+
   if(fp$eppmod == "rspline"){
     nk <- fp$numKnots
     tau2 <- exp(theta[nk+3])
     
-    return(sum(dnorm(theta[3:nk], 0, sqrt(tau2), log=TRUE)) +
-           dunif(theta[nk+1], logiota.unif.prior[1], logiota.unif.prior[2], log=TRUE) + 
-           dnorm(theta[nk+2], ancbias.pr.mean, ancbias.pr.sd, log=TRUE) +
-           ldinvgamma(tau2, invGammaParameter, invGammaParameter) + log(tau2) +  # + log(tau2): multiply likelihood by jacobian of exponential transformation
-           dexp(exp(theta[nk+4]), vinfl.prior.rate, TRUE) + theta[nk+4])         # additional ANC variance
+    lpr <- sum(dnorm(theta[3:nk], 0, sqrt(tau2), log=TRUE)) +
+      dunif(theta[nk+1], logiota.unif.prior[1], logiota.unif.prior[2], log=TRUE) + 
+      dnorm(theta[nk+2], ancbias.pr.mean, ancbias.pr.sd, log=TRUE) +
+      ldinvgamma(tau2, invGammaParameter, invGammaParameter) + log(tau2)   # + log(tau2): multiply likelihood by jacobian of exponential transformation
+
+    if(!exists("v.infl", where=fp))
+      lpr <- lpr + dexp(exp(theta[nk+4]), vinfl.prior.rate, TRUE) + theta[nk+4]         # additional ANC variance
+
   } else { # rtrend
 
-    return(dunif(theta[1], t0.unif.prior[1], t0.unif.prior[2], log=TRUE) +
-           dunif(theta[2], t1.unif.prior[1], t1.unif.prior[2], log=TRUE) +
-           dunif(theta[3], logr0.unif.prior[1], logr0.unif.prior[2], log=TRUE) +
-           sum(dnorm(theta[4:7], 0, rtrend.beta.pr.sd, log=TRUE)) +
-           dnorm(theta[8], ancbias.pr.mean, ancbias.pr.sd, log=TRUE) +
-           dexp(exp(theta[9]), vinfl.prior.rate, TRUE) + theta[9])   # additional ANC variance
+    lpr <- dunif(round(theta[1]), t0.unif.prior[1], t0.unif.prior[2], log=TRUE) +
+      ## dunif(theta[2], t1.unif.prior[1], t1.unif.prior[2], log=TRUE) +
+      dnorm(round(theta[2]), t1.pr.mean, t1.pr.sd, log=TRUE) +
+      ## dunif(theta[3], logr0.unif.prior[1], logr0.unif.prior[2], log=TRUE) +
+      dnorm(theta[3], logr0.pr.mean, logr0.pr.sd, log=TRUE) +
+      sum(dnorm(theta[4:7], rtrend.beta.pr.mean, rtrend.beta.pr.sd, log=TRUE)) +
+      dnorm(theta[8], ancbias.pr.mean, ancbias.pr.sd, log=TRUE)
+
+    if(!exists("v.infl", where=fp))
+      lpr <- lpr + dexp(exp(theta[9]), vinfl.prior.rate, TRUE) + theta[9]   # additional ANC variance
   }
+  
+  return(lpr)
 }
 
 ################################
@@ -100,18 +120,24 @@ fnCreateParam <- function(theta, fp){
     for(i in 3:fp$numKnots)
       beta[i] <- -beta[i-2] + 2*beta[i-1] + u[i]
     
-    return(list(rvec = as.vector(fp$rvec.spldes %*% beta),
-                iota = exp(theta[fp$numKnots+1]),
-                ancbias = theta[fp$numKnots+2],
-                v.infl = exp(theta[fp$numKnots+4])))
+    param <- list(rvec = as.vector(fp$rvec.spldes %*% beta),
+                  iota = exp(theta[fp$numKnots+1]),
+                  ancbias = theta[fp$numKnots+2])
+    if(!exists("v.infl", where=fp))
+      param$v.infl <- exp(theta[fp$numKnots+4])
+      
+
   } else { # rtrend
-    return(list(tsEpidemicStart = fp$proj.steps[which.min(abs(fp$proj.steps - theta[1]))], # t0
-                rtrend = list(tStabilize = theta[1]+theta[2],  # t0 + t1
-                              r0 = exp(theta[3]),              # r0
-                              beta = theta[4:7]),
-                ancbias = theta[8],
-                v.infl = exp(theta[9])))
+    param <- list(tsEpidemicStart = fp$proj.steps[which.min(abs(fp$proj.steps - (round(theta[1]-0.5)+0.5)))], # t0
+                  rtrend = list(tStabilize = round(theta[1]-0.5)+0.5+round(theta[2]),  # t0 + t1
+                                r0 = exp(theta[3]),              # r0
+                                beta = theta[4:7]),
+                  ancbias = theta[8])
+    if(!exists("v.infl", where=fp))
+      param$v.infl <- exp(theta[9])
   }
+
+  return(param)
 }
 
 ll <- function(theta, fp, likdat){
@@ -155,10 +181,19 @@ sample.prior <- function(n, fp){
   if(!exists("eppmod", where = fp))  # backward compatibility
     fp$eppmod <- "rspline"
 
+  if(exists("prior_args", where = fp)){
+    for(i in seq_along(fp$prior_args))
+      assign(names(fp$prior_args)[i], fp$prior_args[[i]])
+  }
+  
+  nparam <- if(fp$eppmod == "rspline") fp$numKnots+3 else 8
+  if(!exists("v.infl", fp))
+    nparam <- nparam+1L
+  
+  mat <- matrix(NA, n, nparam)
+
   if(fp$eppmod == "rspline"){
        
-    mat <- matrix(NA, n, fp$numKnots+4)
-
     ## sample penalty variance
     tau2 <- rexp(n, tau2.prior.rate)                  # variance of second-order spline differences
     
@@ -167,20 +202,24 @@ sample.prior <- function(n, fp){
     mat[,fp$numKnots+1] <-  runif(n, logiota.unif.prior[1], logiota.unif.prior[2])  # iota
     mat[,fp$numKnots+2] <-  rnorm(n, ancbias.pr.mean, ancbias.pr.sd)                # ancbias parameter
     mat[,fp$numKnots+3] <- log(tau2)                                                # tau2
-    mat[,fp$numKnots+4] <- log(rexp(n, vinfl.prior.rate))                           # v.infl
 
+    if(!exists("v.infl", where=fp))
+      mat[,fp$numKnots+4] <- log(rexp(n, vinfl.prior.rate))
+    
   } else { # r-trend
 
-    mat <- matrix(NA, n, 9)
-
     mat[,1] <- runif(n, t0.unif.prior[1], t0.unif.prior[2])        # t0
-    mat[,2] <- runif(n, t1.unif.prior[1], t1.unif.prior[2])        # t1
-    mat[,3] <- runif(n, logr0.unif.prior[1], logr0.unif.prior[2])  # r0
-    mat[,4:7] <- rnorm(4*n, 0, rtrend.beta.pr.sd)                  # beta
+    ## mat[,2] <- runif(n, t1.unif.prior[1], t1.unif.prior[2])        # t1
+    mat[,2] <- rnorm(n, t1.pr.mean, t1.pr.sd)
+    ## mat[,3] <- runif(n, logr0.unif.prior[1], logr0.unif.prior[2])  # r0
+    mat[,3] <- rnorm(n, logr0.pr.mean, logr0.pr.sd)  # r0
+    mat[,4:7] <- t(matrix(rnorm(4*n, rtrend.beta.pr.mean, rtrend.beta.pr.sd), 4, n))  # beta
     mat[,8] <- rnorm(n, ancbias.pr.mean, ancbias.pr.sd)            # ancbias parameter
-    mat[,9] <- log(rexp(n, vinfl.prior.rate))                      # v.infl
+
+    if(!exists("v.infl", where=fp))
+      mat[,9] <- log(rexp(n, vinfl.prior.rate))
   }
-  
+
   return(mat)
 }
 
