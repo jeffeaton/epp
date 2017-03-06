@@ -24,7 +24,7 @@ SEXP eppC(SEXP s_eppPopTS, SEXP s_projsteps, SEXP s_dt,
 	  SEXP s_rspline_rvec, SEXP s_iota, SEXP s_relinfectART, SEXP s_tsEpidemicStart,
 	  SEXP s_rtrend_beta, SEXP s_rtrend_tstabilize, SEXP s_rtrend_r0,
 	  SEXP s_cd4init, SEXP s_cd4prog, SEXP s_cd4artmort,
-	  SEXP s_artnumTS, SEXP s_arteligidxTS, SEXP s_specpop_perceligTS,
+	  SEXP s_artnumTS, SEXP s_arteligidxTS, SEXP s_artispercTS, SEXP s_specpop_perceligTS,
 	  SEXP s_hivp15yr_cd4dist, SEXP s_art15yr_cd4dist){
 
   size_t nsteps = length(s_projsteps);
@@ -66,6 +66,7 @@ SEXP eppC(SEXP s_eppPopTS, SEXP s_projsteps, SEXP s_dt,
 
   double *artnum_ts = REAL(s_artnumTS);
   int *arteligidx_ts = INTEGER(s_arteligidxTS);
+  int *artisperc_ts = INTEGER(s_artispercTS);
   double *specpop_perceligTS = REAL(s_specpop_perceligTS);
 
   double *hivp15yr_cd4dist = REAL(s_hivp15yr_cd4dist);
@@ -171,23 +172,39 @@ SEXP eppC(SEXP s_eppPopTS, SEXP s_projsteps, SEXP s_dt,
     // ART initiation
     if(artnum_ts[ts] > 0){
 
-      // determine number of desired ART initiations
-      double artchange = 0.0;
-      for(size_t m = 1; m < DS; m++)
-	for(size_t u = 1; u < TS; u++)
-	  artchange += grad[m][u];
-
+      // determine number eligible and initiation weights for each stage (average of expected mortality and eligibility)
       size_t artelig_idx = arteligidx_ts[ts] - 1; 	// -1 for 0-based indexing vs. 1-based indexing in R
       double specpop_percelig = specpop_perceligTS[ts];
-      double art_anninits = (artnum_ts[ts] - Xonart) / dt - artchange;
 
-      // determine number weights for number from each stage (average of expected mortality and eligibility)
       double sum_mortweight = 0.0, artelig = 0.0;
       for(size_t m = (specpop_percelig > 0) ? 1 : artelig_idx; m < DS; m++){
 	double artelig_m = (m < artelig_idx) ? specpop_percelig * X[m][0] : X[m][0];
 	artelig += artelig_m;
 	sum_mortweight += cd4artmort[m-1][0] * artelig_m;
       }
+
+      // if transitioning from number to percentage, linearly scale up
+      // to percentage input over the next year.
+      if(!artisperc_ts[ts-1] & artisperc_ts[ts]){
+	int steps_ann = 1.0 / dt;
+	double artcov_curr = Xonart / (artelig + Xonart);
+	double artcov_target = artnum_ts[ts+steps_ann-1];
+	for(size_t its = 0; its < steps_ann; its++)
+	  artnum_ts[ts+its] = artcov_curr + dt*(its+1)*(artcov_target - artcov_curr);
+      }
+
+      // determine number of desired ART initiations
+      double artchange = 0.0;
+      for(size_t m = 1; m < DS; m++)
+	for(size_t u = 1; u < TS; u++)
+	  artchange += grad[m][u];
+
+      double art_anninits;
+      if(!artisperc_ts[ts])
+	art_anninits = (artnum_ts[ts] - Xonart) / dt - artchange;
+      else
+	art_anninits = (artnum_ts[ts]*(artelig + Xonart) - Xonart) / dt - artchange;
+
       // determine rate to initiate each stage
       double artinitweight[DS], artstageinit[DS];
       for(size_t m = (specpop_percelig > 0) ? 1 : artelig_idx; m < DS; m++){
