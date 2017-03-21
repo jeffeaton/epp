@@ -80,12 +80,15 @@ fnCreateEPPFixPar <- function(epp.input,
   epp.art <- epp.input$epp.art
 
   ## number of persons who should be on ART at end of timestep
-  artnum.ts <- with(subset(epp.art, m.isperc=="N"), approx(year+1-dt, (m.val+f.val)*(1.0-perc50plus/100), proj.steps, rule=2))$y  # offset by 1 year because number on ART are Dec 31
+  artnum.ts <- with(subset(epp.art, m.isperc=="N"), approx(year+1-dt, (m.val+f.val)*(1.0-perc50plus), proj.steps, rule=2))$y  # offset by 1 year because number on ART are Dec 31
   ## !! Currently only dealing with numbers on ART, assuming no increase in coverage after last number
 
-  epp.art$artelig.idx <- match(epp.art$cd4thresh, c(1, 2, 500, 350, 250, 200, 100, 50))
+  epp.art$artelig.idx <- match(epp.art$cd4thresh, c(1, 999, 500, 350, 250, 200, 100, 50))
   artelig.idx.ts <- approx(epp.art$year, epp.art$artelig.idx, proj.steps, "constant", rule=2)$y
-  
+  art_isperc.ts <- approx(epp.art$year, epp.art$m.isperc == "P", proj.steps, "constant", rule=2)$y
+  if(any(art_isperc.ts==1))
+    artnum.ts[as.logical(art_isperc.ts)] <- with(subset(epp.art, m.isperc == "P"), approx(year+1-dt, 0.5*(m.val+f.val)/100, proj.steps[as.logical(art_isperc.ts)], rule=2))$y
+    
   epp.art$specpop.percelig <- rowSums(with(epp.input$art.specpop, mapply(function(percent, year) rep(c(0, percent), c(year - min(epp.art$year), max(epp.art$year) - year+1)), percelig, yearelig)))
   specpop.percelig.ts <- approx(epp.art$year+0.5, epp.art$specpop.percelig, proj.steps, "constant", rule=2)$y
   
@@ -133,6 +136,7 @@ fnCreateEPPFixPar <- function(epp.input,
               epp.pop.ts      = epp.pop.ts,
               artnum.ts       = artnum.ts,
               artelig.idx.ts  = artelig.idx.ts,
+              art_isperc.ts   = art_isperc.ts,
               specpop.percelig.ts = specpop.percelig.ts,
               cd4prog         = cd4prog,
               cd4init         = cd4init,
@@ -177,7 +181,7 @@ simmod.eppfp <- function(fp, VERSION = "C"){
                  fp$rvec, fp$iota, fp$relinfectART, as.numeric(fp$tsEpidemicStart),
                  fp$rtrend$beta, fp$rtrend$tStabilize, fp$rtrend$r0,
                  fp$cd4init, fp$cd4prog, fp$cd4artmort,
-                 fp$artnum.ts, as.integer(fp$artelig.idx.ts), fp$specpop.percelig.ts,
+                 fp$artnum.ts, as.integer(fp$artelig.idx.ts), as.integer(fp$art_isperc.ts), fp$specpop.percelig.ts,
                  fp$hivp15yr.cd4dist, fp$art15yr.cd4dist)
     class(mod) <- "epp"
     return(mod)
@@ -238,12 +242,25 @@ simmod.eppfp <- function(fp, VERSION = "C"){
 
     ## ART initiation
     if(fp$artnum.ts[ts] > 0){
-      artnum.curr <- sum(X[-1,-1])
-      artnum.anninits <- (fp$artnum.ts[ts] - artnum.curr)/dt - sum(grad[-1,-1]) # desired change rate minus current exits
 
       artcd4propelig <- rep(c(fp$specpop.percelig.ts[ts], 1.0),
                             c(fp$artelig.idx.ts[ts]-2, DS-fp$artelig.idx.ts[ts]+1L))
       artelig <- artcd4propelig * X[-1,1]
+
+      artnum.curr <- sum(X[-1,-1])
+
+      if(!fp$art_isperc[ts-1] & fp$art_isperc[ts]){
+        ## if transitioning from number to percentage, linearly scale up
+        ## to percentage input over the next year.
+        artcov_curr <- artnum.curr / (sum(artelig) + artnum.curr)
+        fp$artnum.ts[ts+1:(1/dt)-1] <- artcov_curr + (fp$artnum.ts[ts-1+1/dt] - artcov_curr) * dt*1:(1/dt)
+      }
+
+      if(!fp$art_isperc[ts])
+        artnum.anninits <- (fp$artnum.ts[ts] - artnum.curr)/dt - sum(grad[-1,-1]) # desired change rate minus current exits
+      else
+        artnum.anninits <- max(0, (fp$artnum.ts[ts]*(sum(artelig) + sum(X[-1,-1])) - artnum.curr)/dt - sum(grad[-1,-1]))
+
       expect.mort.weight <- fp$cd4artmort[, 1] / sum(artelig * fp$cd4artmort[, 1])
       artinit.weight <- (expect.mort.weight + 1/sum(artelig))/2  # average eligibility and expected mortality
       artinit.ann.ts <- pmin(artnum.anninits * artinit.weight * artelig,
@@ -300,7 +317,7 @@ update.eppfp <- function(fp, ..., keep.attr=TRUE, list=vector("list")){
   dots<-substitute(list(...))[-1]
   newnames<-names(dots)
   
-  for(j in seq(along=dots)){
+  for(j in seq_along(dots)){
     if(keep.attr)
       attr <- attributes(fp[[newnames[j]]])
     fp[[newnames[j]]]<-eval(dots[[j]],fp, parent.frame())
@@ -309,7 +326,7 @@ update.eppfp <- function(fp, ..., keep.attr=TRUE, list=vector("list")){
   }
 
   listnames <- names(list)
-  for(j in seq(along=list)){
+  for(j in seq_along(list)){
     if(keep.attr)
       attr <- attributes(fp[[listnames[j]]])
     fp[[listnames[j]]]<-eval(list[[j]],fp, parent.frame())
@@ -341,3 +358,10 @@ fnPregARTCov <- function(mod, cd4stage.weights=c(1.3, 0.6, 0.1, 0.1, 0.0, 0.0, 0
 
   return((pregweight.art.less1yr+pregweight.art1yr)/(pregweight.art.less1yr+pregweight.art1yr+pregweight.noart))
 }
+
+
+pop15to49.epp <- function(mod){rowSums(mod)}
+artcov15to49.epp <- function(mod){rowSums(mod[,-1,-1]) / rowSums(mod[,-1,])}
+artpop15to49.epp <- function(mod){rowSums(mod[,-1,-1])}
+artcov15plus.epp <- function(mod){NA}
+

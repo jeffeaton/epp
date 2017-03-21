@@ -11,11 +11,11 @@ read_epp_input <- function(pjnz){
   ep1 <- scan(con, "character", sep="\n")
   close(con)
 
-  country.idx <- which(sapply(ep1, substr, 1, 7) == "COUNTRY")
+  country.idx <- grep("COUNTRY", ep1)
   firstprojyr.idx <-  which(sapply(ep1, substr, 1, 11) == "FIRSTPROJYR")
   lastprojyr.idx <-  which(sapply(ep1, substr, 1, 10) == "LASTPROJYR")
-  popstart.idx <- which(ep1 == "POPSTART")+1
-  popend.idx <- which(ep1 == "POPEND")-1
+  popstart.idx <- grep("POPSTART", ep1)+1
+  popend.idx <- grep("POPEND", ep1)-1
 
   country <- as.character(read.csv(text=ep1[country.idx], header=FALSE, as.is=TRUE)[2])
   country.code <- as.integer(read.csv(text=ep1[country.idx], header=FALSE)[3])
@@ -39,28 +39,29 @@ read_epp_input <- function(pjnz){
   alpha2.idx <- which(sapply(ep4, substr, 1, 6) == "ALPHA2")
   alpha3.idx <- which(sapply(ep4, substr, 1, 6) == "ALPHA3")
   infectreduc.idx <- which(sapply(ep4, substr, 1, 11) == "INFECTREDUC")
-  artstart.idx <- which(ep4 == "ARTSTART")+1
-  artend.idx <- which(ep4 == "ARTEND")-1
+  artstart.idx <- grep("ARTSTART", ep4)+1
+  artend.idx <- grep("ARTEND", ep4)-1
 
-  cd4lim <- as.integer(read.csv(text=ep4[cd4lim.idx], header=FALSE)[-1])
-  cd4init <- as.matrix(read.csv(text=ep4[cd4init.idx], header=FALSE, row.names=1))
-  lambda <- as.matrix(read.csv(text=ep4[lambda.idx], header=FALSE, row.names=1))
-  mu <- as.matrix(read.csv(text=ep4[mu.idx], header=FALSE, row.names=1))
-  alpha1 <- as.matrix(read.csv(text=ep4[alpha1.idx], header=FALSE, row.names=1))
-  alpha2 <- as.matrix(read.csv(text=ep4[alpha2.idx], header=FALSE, row.names=1))
-  alpha3 <- as.matrix(read.csv(text=ep4[alpha3.idx], header=FALSE, row.names=1))
+  DS <- 7 # disease stages
+
+  cd4lim <- as.integer(read.csv(text=ep4[cd4lim.idx], header=FALSE)[-1][1:DS])
+  cd4init <- as.matrix(read.csv(text=ep4[cd4init.idx], header=FALSE, row.names=1)[,1:DS])
+  lambda <- as.matrix(read.csv(text=ep4[lambda.idx], header=FALSE, row.names=1)[,1:(DS-1)])
+  mu <- as.matrix(read.csv(text=ep4[mu.idx], header=FALSE, row.names=1)[,1:DS])
+  alpha1 <- as.matrix(read.csv(text=ep4[alpha1.idx], header=FALSE, row.names=1)[,1:DS])
+  alpha2 <- as.matrix(read.csv(text=ep4[alpha2.idx], header=FALSE, row.names=1)[,1:DS])
+  alpha3 <- as.matrix(read.csv(text=ep4[alpha3.idx], header=FALSE, row.names=1)[,1:DS])
   infectreduc <- as.numeric(read.csv(text=ep4[infectreduc.idx], header=FALSE)[2])
 
   epp.art <- setNames(read.csv(text=ep4[artstart.idx:artend.idx], header=FALSE, as.is=TRUE),
                       c("year", "m.isperc", "m.val", "f.isperc", "f.val", "cd4thresh", "m.perc50plus", "f.perc50plus", "perc50plus", "1stto2ndline"))
 
   specpop.idx <- grep("SPECPOP", ep4)
-  art.specpop <- read.csv(text=ep4[specpop.idx], header=FALSE,
-                          colClasses=c("NULL", "character", "numeric", "integer"),
-                          col.names=c(NA, "specpop", "percelig", "yearelig"))
+  art.specpop <- setNames(read.csv(text=ep4[specpop.idx], header=FALSE,
+                                   colClasses=c("NULL", "character", "numeric", "integer"))[,1:3],
+                          c("specpop", "percelig", "yearelig"))
   art.specpop$percelig <- art.specpop$percelig/100
   
-
   cd4median.start.idx <- which(ep4 == "CD4MEDIAN_START")+1
   cd4median.end.idx <- which(ep4 == "CD4MEDIAN_END")-1
   if(length(cd4median.start.idx) > 0)
@@ -174,9 +175,11 @@ read_epp_data <- function(pjnz){
   r <- xmlRoot(obj)[[1]]
   eppSetChildren.idx <- which(xmlSApply(r, xmlAttrs) == "eppSetChildren")
   country <- xmlToList(r[[which(xmlSApply(r, xmlAttrs) == "worksetCountry")]][[1]])
+  country_code <- xmlToList(r[[which(xmlSApply(r, xmlAttrs) == "countryCode")]][[1]])
 
   epp.data <- list() # declare list to store output
   attr(epp.data, "country") <- country
+  attr(epp.data, "country_code") <- country_code
 
   for(eppSet.idx in 1:xmlSize(r[[eppSetChildren.idx]])){
 
@@ -189,6 +192,7 @@ read_epp_data <- function(pjnz){
     siteSelected.idx <- which(xmlSApply(eppSet, xmlAttrs) == "siteSelected")
     survData.idx <- which(xmlSApply(eppSet, xmlAttrs) == "survData")
     survSampleSizes.idx <- which(xmlSApply(eppSet, xmlAttrs) == "survSampleSizes")
+
 
     siteNames <- xmlSApply(eppSet[[siteNames.idx]][[1]], xmlSApply, xmlToList, FALSE)
     siteIdx <- as.numeric(xmlSApply(eppSet[[siteNames.idx]][[1]], xmlAttrs)) ## 0 based
@@ -227,6 +231,63 @@ read_epp_data <- function(pjnz){
     anc.n[anc.n == -1] <- NA
 
 
+    ## ANC-RT site level
+
+    pmtctdata.idx <- which(xmlSApply(eppSet, xmlAttrs) == "PMTCTData")
+    pmtctsitesamplesizes.idx <- which(xmlSApply(eppSet, xmlAttrs) == "PMTCTSiteSampleSizes")
+
+    if(length(pmtctdata.idx)){
+      ancrtsite.prev <- matrix(NA, nsites, nANCyears, dimnames=list(siteNames, 1985+0:(nANCyears-1)))
+      for(clinic.idx in 1:nsites){
+        clinic <- eppSet[[pmtctdata.idx]][["array"]][[clinic.idx]][[1]]
+        prev <- as.numeric(xmlSApply(clinic, xmlSApply, xmlToList, FALSE))
+        idx <- as.integer(xmlSApply(clinic, xmlAttrs)) + 1
+        ancrtsite.prev[clinic.idx, idx] <- prev
+      }
+      ancrtsite.prev[is.na(ancrtsite.prev)] <- 0.0 
+      ancrtsite.prev[ancrtsite.prev == -1] <- NA
+      ancrtsite.prev <- ancrtsite.prev/100
+
+      ancrtsite.n <- matrix(NA, nsites, nANCyears, dimnames=list(siteNames, 1985+0:(nANCyears-1)))
+      for(clinic.idx in 1:nsites){
+        clinic <- eppSet[[pmtctsitesamplesizes.idx]][["array"]][[clinic.idx]][[1]]
+        n <- as.numeric(xmlSApply(clinic, xmlSApply, xmlToList, FALSE))
+        idx <- as.integer(xmlSApply(clinic, xmlAttrs)) + 1
+        ancrtsite.n[clinic.idx, idx] <- n
+      }
+      ancrtsite.n[ancrtsite.n == -1] <- NA
+    } else {
+      ancrtsite.prev <- NULL
+      ancrtsite.n <- NULL
+    }
+      
+    
+    ## ANC-RT census level
+
+    pmtctcensdata.idx <- which(xmlSApply(eppSet, xmlAttrs) == "censusPMTCTSurvData")
+    pmtctcenssamplesizes.idx <- which(xmlSApply(eppSet, xmlAttrs) == "censusPMTCTSampleSizes")
+
+    if(length(pmtctcensdata.idx)){
+      ancrtcens.prev <- setNames(numeric(nANCyears), 1985+0:(nANCyears-1))
+      obj <- eppSet[[pmtctcensdata.idx]][[1]]
+      idx <- as.integer(xmlSApply(obj, xmlAttrs)) + 1
+      ancrtcens.prev[idx] <- as.numeric(xmlSApply(obj, xmlSApply, xmlToList, FALSE))
+      ancrtcens.prev[is.na(ancrtcens.prev)] <- 0.0 
+      ancrtcens.prev[ancrtcens.prev == -1] <- NA
+      ancrtcens.prev <- ancrtcens.prev/100
+
+      ancrtcens.n <- setNames(numeric(nANCyears), 1985+0:(nANCyears-1))
+      obj <- eppSet[[pmtctcenssamplesizes.idx]][[1]]
+      idx <- as.integer(xmlSApply(obj, xmlAttrs)) + 1
+      ancrtcens.n[idx] <- as.numeric(xmlSApply(obj, xmlSApply, xmlToList, FALSE))
+      ancrtcens.n[is.na(ancrtcens.n)] <- 0.0 
+      ancrtcens.n[ancrtcens.n == -1] <- NA
+    } else {
+      ancrtcens.prev <- NULL
+      ancrtcens.n <- NULL
+    }
+
+    
     ##  HH surveys  ##
 
     hhsUsed.idx <- which(xmlSApply(eppSet, xmlAttrs) == "surveyIsUsed")
@@ -256,6 +317,10 @@ read_epp_data <- function(pjnz){
                                 anc.used=anc.used,
                                 anc.prev=anc.prev,
                                 anc.n=anc.n,
+                                ancrtsite.prev=ancrtsite.prev,
+                                ancrtsite.n=ancrtsite.n,
+                                ancrtcens.prev=ancrtcens.prev,
+                                ancrtcens.n=ancrtcens.n,
                                 hhs=hhs)
   }
 
@@ -280,9 +345,11 @@ read_epp_subpops <- function(pjnz){
   r <- xmlRoot(obj)[[1]]
   eppSetChildren.idx <- which(xmlSApply(r, xmlAttrs) == "eppSetChildren")
   country <- xmlToList(r[[which(xmlSApply(r, xmlAttrs) == "worksetCountry")]][[1]])
+  country_code <- xmlToList(r[[which(xmlSApply(r, xmlAttrs) == "countryCode")]][[1]])
 
   epp.pops <- list() # declare list to store output
   attr(epp.pops, "country") <- country
+  attr(epp.pops, "country_code") <- country_code
 
   workset.startyear <- as.integer(xmlToList(r[[which(xmlSApply(r, xmlAttrs) == "worksetStartYear")]][[1]]))
   workset.endyear <- as.integer(xmlToList(r[[which(xmlSApply(r, xmlAttrs) == "worksetEndYear")]][[1]]))
@@ -333,6 +400,60 @@ read_epp_subpops <- function(pjnz){
 
   return(epp.pops)
 }
+
+
+#####################################################
+####  Read EPP prevalence and incidence outputs  ####
+#####################################################
+
+read_spt <- function(pjnz){
+
+  sptfile <- grep("\\.SPT$", unzip(pjnz, list=TRUE)$Name, value=TRUE)
+  con <- unz(pjnz, sptfile)
+  spt <- scan(con, "character", sep="\n")
+  close(con)
+
+  break.rows <- which(spt == "==")
+ sub.break.rows <- which(spt == "=")
+ n.years <- sub.break.rows[2] - break.rows[1] - 3
+ regions <- sapply(strsplit(as.character(spt[break.rows+1]), "\\\\"), function(x) strsplit(x[2], ":")[[1]][1])[-length(break.rows)]
+ regions[is.na(regions)] <- "National"
+
+ out <- lapply(sub.break.rows[-1], 
+               function(idx){
+                 dat <- spt[idx-n.years:1]
+                 mat <- data.frame(t(sapply(strsplit(dat, ","), as.numeric)), row.names=1)
+                 mat[,1:2] <- mat[,1:2]/100
+                 names(mat) <- c("prev", "incid", "pop")[1:ncol(mat)]
+                 return(mat)
+               })
+
+ names(out) <- regions
+ return(out)
+}
+
+read_spu <- function(pjnz){
+
+  spufile <- grep("\\.SPU$", unzip(pjnz, list=TRUE)$Name, value=TRUE)
+  spu <- read.csv(unz(pjnz, spufile), header=FALSE)
+
+  n.resamp <- as.numeric(strsplit(as.character(spu[1,1]), " ")[[1]][3])
+  break.rows <- which(spu[,1] == "==")
+  n.years <- break.rows[2] - break.rows[1] - 2
+  count <- sapply(strsplit(as.character(spu[break.rows[-1]-(n.years+1),1]), " "), function(x) as.numeric(x[2]))
+  
+  years <- as.numeric(as.character(spu[break.rows[1]-n.years:1,1]))
+  
+  incid <- sapply(break.rows[-1], function(idx) spu[idx-n.years:1,3])[,rep(1:length(count), count)]/100
+  prev <- sapply(break.rows[-1], function(idx) spu[idx-n.years:1,2])[,rep(1:length(count), count)]/100
+
+  rownames(incid) <- years
+  rownames(prev) <- years
+
+  return(list("incid"=incid, "prev"=prev))
+}
+
+
 
 
 ###################
