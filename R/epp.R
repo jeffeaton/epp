@@ -317,7 +317,7 @@ update.eppfp <- function(fp, ..., keep.attr=TRUE, list=vector("list")){
   dots<-substitute(list(...))[-1]
   newnames<-names(dots)
   
-  for(j in seq(along=dots)){
+  for(j in seq_along(dots)){
     if(keep.attr)
       attr <- attributes(fp[[newnames[j]]])
     fp[[newnames[j]]]<-eval(dots[[j]],fp, parent.frame())
@@ -326,7 +326,7 @@ update.eppfp <- function(fp, ..., keep.attr=TRUE, list=vector("list")){
   }
 
   listnames <- names(list)
-  for(j in seq(along=list)){
+  for(j in seq_along(list)){
     if(keep.attr)
       attr <- attributes(fp[[listnames[j]]])
     fp[[listnames[j]]]<-eval(list[[j]],fp, parent.frame())
@@ -358,3 +358,10 @@ fnPregARTCov <- function(mod, cd4stage.weights=c(1.3, 0.6, 0.1, 0.1, 0.0, 0.0, 0
 
   return((pregweight.art.less1yr+pregweight.art1yr)/(pregweight.art.less1yr+pregweight.art1yr+pregweight.noart))
 }
+
+
+pop15to49.epp <- function(mod){rowSums(mod)}
+artcov15to49.epp <- function(mod){rowSums(mod[,-1,-1]) / rowSums(mod[,-1,])}
+artpop15to49.epp <- function(mod){rowSums(mod[,-1,-1])}
+artcov15plus.epp <- function(mod){NA}
+
