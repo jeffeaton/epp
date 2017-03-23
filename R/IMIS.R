@@ -67,7 +67,7 @@ IMIS <- function(B0, B, B.re, number_k, D=0, opt_iter=0, fp, likdat,
       n_all <- n_all + dim(X_k)[1]
       X_k <- NULL
       which_exclude = NULL					# exclude the neighborhood of the local optima
-      label_weight = sort(Weights, decreasing = TRUE, index = TRUE)
+      label_weight = sort(Weights, decreasing = TRUE, index.return = TRUE)
       which_remain = which(Weights > 0)  # the candidate inputs for the starting points
       size_remain = length(which_remain)
       for(i in 1:D){
@@ -118,7 +118,7 @@ IMIS <- function(B0, B, B.re, number_k, D=0, opt_iter=0, fp, likdat,
         distance_remain <- mahalanobis(X_all[which_pos[which_remain],], center_all[i,], diag(diag(Sig2_global)) )
         
         ## exclude the neighborhood of the local optima 
-        label_dist <- sort(distance_remain, decreasing = FALSE, index=TRUE)
+        label_dist <- sort(distance_remain, decreasing = FALSE, index.return=TRUE)
         which_exclude <- union( which_exclude, which_remain[label_dist$ix[1:floor(size_remain/D)]])
         which_remain <- setdiff(which_remain, which_exclude)
 
@@ -133,7 +133,7 @@ IMIS <- function(B0, B, B.re, number_k, D=0, opt_iter=0, fp, likdat,
       X_imp <- X_all[which_pos[important],]            # X_imp is the maximum weight input
       center_all <- rbind(center_all, X_imp)
       distance_all <- mahalanobis(X_all[1:(n_all+dim(X_k)[1]),], X_imp, diag(diag(Sig2_global)) )
-      label_nr = sort(distance_all, decreasing = FALSE, index=TRUE, method="quick")             # Sort the distances
+      label_nr = sort(distance_all, decreasing = FALSE, index.return=TRUE, method="quick")             # Sort the distances
       which_var = label_nr$ix[1:B]                                                              # Pick B inputs for covariance calculation
 
       ## #########
