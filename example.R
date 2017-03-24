@@ -27,7 +27,8 @@ bw.out <- prepare_epp_fit(bw.path, proj.end=2015.5)
 
 ## r-spline model: fixed parameter values
 theta.rspline <- c(2.16003605, -0.76713859, 0.21682066, 0.03286402, 0.21494412,
-                   0.40138627, -0.08235464, -16.32721684, 0.21625028, -2.97511957, -4.199)
+                   0.40138627, -0.08235464, -16.32721684, -2.97511957,
+                   0.21625028, -4.199)
 
 fp <- attr(bw.out$Urban, "eppfp")
 param <- fnCreateParam(theta.rspline, fp)

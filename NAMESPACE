@@ -4,6 +4,7 @@ export(fnCreateEPPSubpops, fnCreateLikDat, fnCreateEPPFixPar, fnCreateParam, sim
 export(update.eppfp, prev, fnPregPrev, incid, ll, IMIS)
 export(read_epp_input, read_epp_data, read_epp_subpops, read_spu, read_spt)
 export(fitmod, simfit, prepare_epp_fit)
+export(prepare_ancrtcens_likdat)
 
 S3method(simmod, eppfp)
 S3method(simfit, eppfit)
