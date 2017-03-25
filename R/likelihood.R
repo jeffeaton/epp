@@ -197,10 +197,12 @@ lprior <- function(theta, fp){
 
   paramcurr <- epp_nparam+anclik_nparam
   if(exists("ancrt", fp) && fp$ancrt %in% c("census", "both")){
-    lpr <- lpr +
-      dnorm(theta[paramcurr+1], ancrtcens.bias.pr.mean, ancrtcens.bias.pr.sd, log=TRUE) +
-      dexp(exp(theta[paramcurr+2]), ancrtcens.vinfl.pr.rate, TRUE) + theta[paramcurr+2]
-    paramcurr <- paramcurr+1
+    lpr <- lpr + dnorm(theta[paramcurr+1], ancrtcens.bias.pr.mean, ancrtcens.bias.pr.sd, log=TRUE)
+    if(!exists("ancrtcens.vinfl", fp)){
+      lpr <- lpr + dexp(exp(theta[paramcurr+2]), ancrtcens.vinfl.pr.rate, TRUE) + theta[paramcurr+2]
+      paramcurr <- paramcurr+2
+    } else 
+      paramcurr <- paramcurr+1
   } else if(exists("ancrt", fp) && fp$ancrt %in% c("site", "both")){
     lpr <- lpr +
       dnorm(theta[paramcurr+1], ancrtsite.beta.pr.mean, ancrtsite.beta.pr.sd, log=TRUE) ## +
@@ -296,8 +298,11 @@ fnCreateParam <- function(theta, fp){
   paramcurr <- epp_nparam+anclik_nparam
   if(exists("ancrt", fp) && fp$ancrt %in% c("census", "both")){
     param$ancrtcens.bias <- theta[paramcurr+1]
-    param$ancrtcens.vinfl <- exp(theta[paramcurr+2])
-    paramcurr <- paramcurr+2
+    if(!exists("ancrtcens.vinfl", fp)){
+      param$ancrtcens.vinfl <- exp(theta[paramcurr+2])
+      paramcurr <- paramcurr+2
+    } else
+      paramcurr <- paramcurr+1
   }
   if(exists("ancrt", fp) && fp$ancrt %in% c("site", "both")){
     param$ancrtsite.beta <- theta[paramcurr+1]
@@ -370,13 +375,17 @@ sample.prior <- function(n, fp){
     anclik_nparam <- 1
 
   if(exists("ancrt", fp) && fp$ancrt == "both")
-    ancrt_nparam <- 3
-  else if(exists("ancrt", fp) && fp$ancrt == "census")
     ancrt_nparam <- 2
+  else if(exists("ancrt", fp) && fp$ancrt == "census")
+    ancrt_nparam <- 1
   else if(exists("ancrt", fp) && fp$ancrt == "site")
     ancrt_nparam <- 1
   else
     ancrt_nparam <- 0
+
+  if(exists("ancrt", fp) && fp$ancrt %in% c("census", "both") && !exists("ancrtcens.vinfl", fp))
+    ancrt_nparam <- ancrt_nparam+1
+
 
   nparam <- epp_nparam+anclik_nparam+ancrt_nparam
 
@@ -416,8 +425,11 @@ sample.prior <- function(n, fp){
   paramcurr <- epp_nparam+anclik_nparam
   if(exists("ancrt", where=fp) && fp$ancrt %in% c("census", "both")){
     mat[,paramcurr+1] <- rnorm(n, ancrtcens.bias.pr.mean, ancrtcens.bias.pr.sd)
-    mat[,paramcurr+2] <- log(rexp(n, ancrtcens.vinfl.pr.rate))
-    paramcurr <- paramcurr+2
+    if(!exists("ancrtcens.vinfl", fp)){
+      mat[,paramcurr+2] <- log(rexp(n, ancrtcens.vinfl.pr.rate))
+      paramcurr <- paramcurr+2
+    } else
+      paramcurr <- paramcurr+1
   }
   if(exists("ancrt", where=fp) && fp$ancrt %in% c("site", "both")){
     mat[,paramcurr+1] <- rnorm(n, ancrtsite.beta.pr.mean, ancrtsite.beta.pr.sd)
