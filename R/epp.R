@@ -107,9 +107,11 @@ fnCreateEPPFixPar <- function(epp.input,
   ###########################
 
   numKnots <- 7
-  proj.dur <- diff(range(proj.steps))
-  rvec.knots <- seq(min(proj.steps) - 3*proj.dur/(numKnots-3), max(proj.steps) + 3*proj.dur/(numKnots-3), proj.dur/(numKnots-3))
-  rvec.spldes <- splines::splineDesign(rvec.knots, proj.steps)
+  epi_steps <- proj.steps[proj.steps >= tsEpidemicStart]
+  proj.dur <- diff(range(epi_steps))
+  rvec.knots <- seq(min(epi_steps) - 3*proj.dur/(numKnots-3), max(epi_steps) + 3*proj.dur/(numKnots-3), proj.dur/(numKnots-3))
+  rvec.spldes <- rbind(matrix(0, length(proj.steps) - length(epi_steps), numKnots),
+                       splines::splineDesign(rvec.knots, epi_steps))
 
   #################################
   ##  ANC prevalence adjustment  ##

@@ -282,11 +282,13 @@ read_epp_data <- function(pjnz){
       ancrtcens.n[idx] <- as.numeric(xmlSApply(obj, xmlSApply, xmlToList, FALSE))
       ancrtcens.n[is.na(ancrtcens.n)] <- 0.0 
       ancrtcens.n[ancrtcens.n == -1] <- NA
+      ancrtcens <- data.frame(year=as.integer(names(ancrtcens.prev)), prev=ancrtcens.prev, n=ancrtcens.n)
+      ancrtcens <- subset(ancrtcens, !is.na(prev) | !is.na(n))
     } else {
-      ancrtcens.prev <- NULL
-      ancrtcens.n <- NULL
+      ancrtcens <- NULL
     }
 
+    
     
     ##  HH surveys  ##
 
@@ -319,8 +321,7 @@ read_epp_data <- function(pjnz){
                                 anc.n=anc.n,
                                 ancrtsite.prev=ancrtsite.prev,
                                 ancrtsite.n=ancrtsite.n,
-                                ancrtcens.prev=ancrtcens.prev,
-                                ancrtcens.n=ancrtcens.n,
+                                ancrtcens=ancrtcens,
                                 hhs=hhs)
   }
 

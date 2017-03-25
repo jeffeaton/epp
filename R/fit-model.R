@@ -8,17 +8,28 @@ fitmod <- function(obj, ..., B0 = 1e5, B = 1e4, B.re = 3000, number_k = 500, D=0
   fp <- attr(obj, 'eppfp')
   fp <- update(fp, ...)
 
-  likdat <- attr(obj, 'likdat')
+  ## Prepare likelihood data
+  eppd <- attr(obj, "eppd")
+  
+  if(exists("ancrt", fp) && fp$ancrt == "none")
+    eppd$ancrtcens <- eppd$ancrtsite.prev <- eppd$ancrtsite.n <- NULL
+  else if(exists("ancrt", fp) && fp$ancrt == "census")
+    eppd$ancrtsite.prev <- eppd$ancrtsite.n <- NULL
+  else if(exists("ancrt", fp) && fp$ancrt == "site")
+    eppd$ancrtcens <- NULL
 
-  if(!exists("rtpw", fp) || fp$rtpw != "census")
-    likdat$rtpwcens.dat <- NULL
+  if(is.null(eppd$ancrtcens) && is.null(eppd$ancrtsite.prev)){
+    fp$ancrt <- "none"
+    fp$ancrtsite.beta <- 0
+  } else if(!is.null(eppd$ancrtcens) && is.null(eppd$ancrtsite.prev)){
+    fp$ancrt <- "census"
+    fp$ancrtsite.beta <- 0
+  } else if(is.null(eppd$ancrtcens) && !is.null(eppd$ancrtsite.prev))
+    fp$ancrt <- "site"
+  else
+    fp$ancrt <- "both"
 
-  likdat$lastdata.idx <- max(unlist(likdat$anclik.dat$anc.idx.lst),
-                             likdat$hhslik.dat$idx,
-                             likdat$rtpwcens.dat$idx)
-  likdat$firstdata.idx <- min(unlist(likdat$anclik.dat$anc.idx.lst),
-                              likdat$hhslik.dat$idx,
-                              likdat$rtpwcens.dat$idx)
+  likdat <- fnCreateLikDat(eppd, floor(fp$proj.steps[1]))
   
 
   ## If IMIS fails, start again
@@ -106,7 +117,6 @@ prepare_epp_fit <- function(pjnz, proj.end=2015.5){
     mapply(function(set, value){ attributes(set)[[attrib]] <- value; set}, obj, value.lst)
 
   val <- set.list.attr(val, "eppd", eppd)
-  val <- set.list.attr(val, "likdat", lapply(eppd, fnCreateLikDat, anchor.year=epp.input$start.year))
   val <- set.list.attr(val, "eppfp", lapply(epp.subp.input, fnCreateEPPFixPar, proj.end = proj.end))
   val <- set.list.attr(val, "country", attr(eppd, "country"))
   val <- set.list.attr(val, "region", names(eppd))
