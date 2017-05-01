@@ -66,7 +66,7 @@ prepare_ancsite_likdat <- function(eppd, anchor.year=1970L){
 
   X.lst <- mapply(cbind, Intercept=lapply(nobs, rep, x=1), ancrt=lapply(nobs, rep, x=0), SIMPLIFY=FALSE)
 
-  if(exists("ancrtsite.prev", where=eppd)){
+  if(exists("ancrtsite.prev", eppd) && !is.null(eppd$ancrtsite.prev)){
     ancrtsite.prev <- eppd$ancrtsite.prev
     ancrtsite.n <- eppd$ancrtsite.n
     
@@ -194,7 +194,6 @@ lprior <- function(theta, fp){
   } else
     anclik_nparam <- 1
 
-
   paramcurr <- epp_nparam+anclik_nparam
   if(exists("ancrt", fp) && fp$ancrt %in% c("census", "both")){
     lpr <- lpr + dnorm(theta[paramcurr+1], ancrtcens.bias.pr.mean, ancrtcens.bias.pr.sd, log=TRUE)
@@ -203,9 +202,9 @@ lprior <- function(theta, fp){
       paramcurr <- paramcurr+2
     } else 
       paramcurr <- paramcurr+1
-  } else if(exists("ancrt", fp) && fp$ancrt %in% c("site", "both")){
-    lpr <- lpr +
-      dnorm(theta[paramcurr+1], ancrtsite.beta.pr.mean, ancrtsite.beta.pr.sd, log=TRUE) ## +
+  }
+  if(exists("ancrt", fp) && fp$ancrt %in% c("site", "both")){
+    lpr <- lpr + dnorm(theta[paramcurr+1], ancrtsite.beta.pr.mean, ancrtsite.beta.pr.sd, log=TRUE) ## +
       ## dexp(exp(theta[np]), ancrtsite.vinfl.pr.rate, TRUE) + theta[np]
   }
   
@@ -340,7 +339,7 @@ ll <- function(theta, fp, likdat){
   if(exists("equil.rprior", where=fp) && fp$equil.rprior){
     rvec.ann <- fp$rvec[fp$proj.steps %% 1 == 0.5]
     equil.rprior.mean <- muSS/(1-pnorm(qM.all[likdat$lastdata.idx]))
-    equil.rprior.sd <- sqrt(mean((muSS/(1-pnorm(qM.all[likdat$lastdata.idx - 10:1])) - rvec.ann[likdat$lastdata.idx - 10:1])^2))  # empirical sd based on 10 previous years
+    equil.rprior.sd <- sqrt(mean((muSS/(1-pnorm(qM.all[likdat$lastdata.idx - 9:0])) - rvec.ann[likdat$lastdata.idx - 9:0])^2))  # empirical sd based on 10 previous years
     ll.rprior <- sum(dnorm(rvec.ann[(likdat$lastdata.idx+1L):length(qM.all)], equil.rprior.mean, equil.rprior.sd, log=TRUE))  # prior starts year after last data
   } else
     ll.rprior <- 0

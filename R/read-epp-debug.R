@@ -27,12 +27,12 @@ read_eppout_posterior <- function(dir, model="rtrend"){
     rural.resample <- read.csv(text=eppout[(rural.idx+20):(min(grep("=========", eppout)[which(grep("=========", eppout) > rural.idx+2)])-1)], header=FALSE)
     names(urban.resample) <- names(rural.resample) <- c("Sample", "Count", "Weight", "Likelihood", "Prior", "logiota", "logtau2", paste0("u", 1:7), "vinfl", "ancbias")
     
-    urban.resample <- urban.resample[rep(seq_len(nrow(urban.resample)), urban.resample$Count), c(paste0("u", 1:7), "logiota", "ancbias", "logtau2", "vinfl")]
-    rural.resample <- rural.resample[rep(seq_len(nrow(rural.resample)), rural.resample$Count), c(paste0("u", 1:7), "logiota", "ancbias", "logtau2", "vinfl")]
-    urban.resample$logvinfl <- log(urban.resample$vinfl)
-    rural.resample$logvinfl <- log(rural.resample$vinfl)
-    urban.resample$vinfl <- NULL
-    rural.resample$vinfl <- NULL
+    urban.resample <- urban.resample[rep(seq_len(nrow(urban.resample)), urban.resample$Count), c(paste0("u", 1:7), "logiota", "logtau2", "ancbias", "vinfl")]
+    rural.resample <- rural.resample[rep(seq_len(nrow(rural.resample)), rural.resample$Count), c(paste0("u", 1:7), "logiota", "logtau2", "ancbias", "vinfl")]
+    ## urban.resample$logvinfl <- log(urban.resample$vinfl)
+    ## rural.resample$logvinfl <- log(rural.resample$vinfl)
+    ## urban.resample$vinfl <- NULL
+    ## rural.resample$vinfl <- NULL
   }
 
   return(list(Urban=urban.resample, Rural=rural.resample))
