@@ -1,41 +1,33 @@
 read_eppout_posterior <- function(dir, model="rtrend"){
-  
+
   eppout <- readLines(list.files(dir, "_full.csv", full.names=TRUE))
 
   reg.idx <- grep("Summary of results and resamples for", eppout)
   reg_names <- sub("(.+)_([A-Za-z]*).*", "\\2", eppout[reg.idx])
-  
-  urban.idx <- grep("Summary of results and resamples for.*Urban", eppout)
-  rural.idx <- grep("Summary of results and resamples for.*Rural", eppout)
-  min(grep("=========", eppout)[which(grep("=========", eppout) > urban.idx+2)])
 
-  if(model=="rtrend"){
-    urban.resample <- read.csv(text=eppout[(urban.idx+27):(min(grep("=========", eppout)[which(grep("=========", eppout) > urban.idx+2)])-1)], header=FALSE)
-    rural.resample <- read.csv(text=eppout[(rural.idx+27):(min(grep("=========", eppout)[which(grep("=========", eppout) > rural.idx+2)])-1)], header=FALSE)
-    names(urban.resample) <- names(rural.resample) <- c("Sample", "Count", "Weight", "Likelihood", "Prior", "t0", "t1", "logr0", "beta0", "beta1", "beta2", "beta3", "vinfl", "ancbias")
-    
-    urban.resample <- urban.resample[rep(seq_len(nrow(urban.resample)), urban.resample$Count), c("t0", "t1", "logr0", "beta0", "beta1", "beta2", "beta3", "ancbias", "vinfl")]
-    rural.resample <- rural.resample[rep(seq_len(nrow(rural.resample)), rural.resample$Count), c("t0", "t1", "logr0", "beta0", "beta1", "beta2", "beta3", "ancbias", "vinfl")]
-    urban.resample$logvinfl <- log(urban.resample$vinfl)
-    rural.resample$logvinfl <- log(rural.resample$vinfl)
-    urban.resample$vinfl <- NULL
-    rural.resample$vinfl <- NULL
+  ret <- list()
+  for(ii in seq_along(reg.idx)){
+    idx <- reg.idx[[ii]]
+    if(model=="rtrend"){
+      resample <- read.csv(text=eppout[(idx+27):(min(grep("=========", eppout)[which(grep("=========", eppout) > idx+2)])-1)], header=FALSE)
+      names(resample) <- c("Sample", "Count", "Weight", "Likelihood", "Prior", "t0", "t1", "logr0", "beta0", "beta1", "beta2", "beta3", "vinfl", "ancbias")
+      resample$logvinfl <- log(resample$vinfl)
+      resample$vinfl <- NULL
+      resample <- resample[rep(seq_len(nrow(resample)), resample$Count), c("t0", "t1", "logr0", "beta0", "beta1", "beta2", "beta3", "ancbias", "vinfl")]
+    }
+
+    if(model=="rspline"){
+      resample <- read.csv(text=eppout[(idx+20):(min(grep("=========", eppout)[which(grep("=========", eppout) > idx+2)])-1)], header=FALSE)
+      names(resample) <- c("Sample", "Count", "Weight", "Likelihood", "Prior", "logiota", "logtau2", paste0("u", 1:7), "vinfl", "ancbias")
+      resample$logvinfl <- log(resample$vinfl)
+      resample$vinfl <- NULL
+      resample <- resample[rep(seq_len(nrow(resample)), resample$Count), c(paste0("u", 1:7), "logiota", "logtau2", "vinfl", "ancbias")]
+      
+    }
+    ret[[reg_names[ii]]] <- resample
   }
 
-  if(model=="rspline"){
-    urban.resample <- read.csv(text=eppout[(urban.idx+20):(min(grep("=========", eppout)[which(grep("=========", eppout) > urban.idx+2)])-1)], header=FALSE)
-    rural.resample <- read.csv(text=eppout[(rural.idx+20):(min(grep("=========", eppout)[which(grep("=========", eppout) > rural.idx+2)])-1)], header=FALSE)
-    names(urban.resample) <- names(rural.resample) <- c("Sample", "Count", "Weight", "Likelihood", "Prior", "logiota", "logtau2", paste0("u", 1:7), "vinfl", "ancbias")
-    
-    urban.resample <- urban.resample[rep(seq_len(nrow(urban.resample)), urban.resample$Count), c(paste0("u", 1:7), "logiota", "logtau2", "ancbias", "vinfl")]
-    rural.resample <- rural.resample[rep(seq_len(nrow(rural.resample)), rural.resample$Count), c(paste0("u", 1:7), "logiota", "logtau2", "ancbias", "vinfl")]
-    ## urban.resample$logvinfl <- log(urban.resample$vinfl)
-    ## rural.resample$logvinfl <- log(rural.resample$vinfl)
-    ## urban.resample$vinfl <- NULL
-    ## rural.resample$vinfl <- NULL
-  }
-
-  return(list(Urban=urban.resample, Rural=rural.resample))
+  return(ret)
 }
 
 
@@ -72,7 +64,7 @@ read_ts_outputs <- function(dir){
 
   rvec <- read_rvec(dir)
   out <- merge(out, data.frame(Year=names(rvec), rvec=rvec), all.x=TRUE)
-  
+
   class(out) <- c("eppdebug", "data.frame")
 
   return(out)
