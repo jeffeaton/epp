@@ -9,7 +9,8 @@
 
 setwd("~/Documents/Code/R/epp/")
 
-library(epp)
+## library(epp)
+devtools::load_all("~/Documents/Code/R/epp/")
 
 
 ## Read Botswana data and prepare fit (available for download: http://apps.unaids.org/spectrum/)
@@ -18,7 +19,7 @@ library(epp)
 
 bw.path <- "~/Documents/Data/Spectrum files/2016 final/SSA/Botswana_ Final_15_04_ 2016 upd.PJNZ"
 
-bw.out <- prepare_epp_fit(bw.path, proj.end=2015.5)
+bw.out <- prepare_epp_fit(bw.path, proj.end=2017.5)
 
 
 #########################
@@ -31,14 +32,18 @@ theta.rspline <- c(2.16003605, -0.76713859, 0.21682066, 0.03286402, 0.21494412,
                    0.21625028, -4.199)
 
 fp <- attr(bw.out$Urban, "eppfp")
+fp$ancrtsite.beta <- 0
+
 param <- fnCreateParam(theta.rspline, fp)
 fp.rspline <- update(fp, list=param)
 mod.rspline <- simmod(fp.rspline)
 
+
+
 round(prev(mod.rspline), 3)               # prevalence
 round(incid(mod.rspline, fp.rspline), 4)  # incidence
 
-likdat <- attr(bw.out$Urban, "likdat")
+likdat <- fnCreateLikDat(attr(bw.out$Urban, "eppd"), 1970L)
 qM <- qnorm(prev(mod.rspline))                              # probit-tranformed prevalence
 log(anclik::fnANClik(qM + fp.rspline$ancbias, likdat$anclik.dat, exp(theta.rspline[11])))   # ANC likelihood
 epp:::fnHHSll(qM, likdat$hhslik.dat)                              # survey likelihood
