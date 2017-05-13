@@ -444,8 +444,13 @@ prior <- function(theta, fp){
   return(unlist(lapply(seq_len(nrow(theta)), function(i) return(exp(lprior(theta[i,], fp))))))
 }
 
-likelihood <- function(theta, fp, likdat){
+likelihood <- function(theta, fp, likdat, log=FALSE){
   if(is.vector(theta))
-    return(exp(ll(theta, fp, likdat)))
-  return(unlist(lapply(seq_len(nrow(theta)), function(i) return(exp(ll(theta[i,], fp, likdat))))))
+    lval <- ll(theta, fp, likdat)
+  else
+    lval <- unlist(lapply(seq_len(nrow(theta)), function(i) ll(theta[i,], fp, likdat)))
+  if(log)
+    return(lval)
+  else
+    return(exp(lval))
 }
