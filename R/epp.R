@@ -88,8 +88,11 @@ fnCreateEPPFixPar <- function(epp.input,
   art_isperc.ts <- approx(epp.art$year, epp.art$m.isperc == "P", proj.steps, "constant", rule=2)$y
   if(any(art_isperc.ts==1))
     artnum.ts[as.logical(art_isperc.ts)] <- with(subset(epp.art, m.isperc == "P"), approx(year+1-dt, 0.5*(m.val+f.val)/100, proj.steps[as.logical(art_isperc.ts)], rule=2))$y
-    
-  epp.art$specpop.percelig <- rowSums(with(epp.input$art.specpop, mapply(function(percent, year) rep(c(0, percent), c(year - min(epp.art$year), max(epp.art$year) - year+1)), percelig, yearelig)))
+
+  if(nrow(epp.input$art.specpop))
+    epp.art$specpop.percelig <- rowSums(with(epp.input$art.specpop, mapply(function(percent, year) rep(c(0, percent), c(year - min(epp.art$year), max(epp.art$year) - year+1)), percelig, yearelig)))
+  else
+    epp.art$specpop.percelig <- 0
   specpop.percelig.ts <- approx(epp.art$year+0.5, epp.art$specpop.percelig, proj.steps, "constant", rule=2)$y
   
   cd4prog <- 1/colMeans(epp.input$cd4stage.dur[c(2:3,6:7),])

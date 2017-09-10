@@ -57,10 +57,13 @@ read_epp_input <- function(pjnz){
                       c("year", "m.isperc", "m.val", "f.isperc", "f.val", "cd4thresh", "m.perc50plus", "f.perc50plus", "perc50plus", "1stto2ndline"))
 
   specpop.idx <- grep("SPECPOP", ep4)
-  art.specpop <- setNames(read.csv(text=ep4[specpop.idx], header=FALSE,
-                                   colClasses=c("NULL", "character", "numeric", "integer"))[,1:3],
-                          c("specpop", "percelig", "yearelig"))
-  art.specpop$percelig <- art.specpop$percelig/100
+  if(length(specpop.idx)){
+    art.specpop <- setNames(read.csv(text=ep4[specpop.idx], header=FALSE,
+                                     colClasses=c("NULL", "character", "numeric", "integer"))[,1:3],
+                            c("specpop", "percelig", "yearelig"))
+    art.specpop$percelig <- art.specpop$percelig/100
+  } else
+    art.specpop <- data.frame(specpop=character(), percelig=numeric(), yearelig=integer())
   
   cd4median.start.idx <- which(ep4 == "CD4MEDIAN_START")+1
   cd4median.end.idx <- which(ep4 == "CD4MEDIAN_END")-1
@@ -181,6 +184,10 @@ read_epp_data <- function(pjnz){
   attr(epp.data, "country") <- country
   attr(epp.data, "country_code") <- country_code
 
+  ## ANC/HSS input mode appears only defined in second set if updated, so define global version.
+  ## Defaults to "HSS mdoe", which is no ANC-RT data.
+  input_mode <- "HSS"
+
   for(eppSet.idx in 1:xmlSize(r[[eppSetChildren.idx]])){
 
     eppSet <- r[[eppSetChildren.idx]][[eppSet.idx]][[1]]
@@ -236,7 +243,11 @@ read_epp_data <- function(pjnz){
     pmtctdata.idx <- which(xmlSApply(eppSet, xmlAttrs) == "PMTCTData")
     pmtctsitesamplesizes.idx <- which(xmlSApply(eppSet, xmlAttrs) == "PMTCTSiteSampleSizes")
 
-    if(length(pmtctdata.idx)){
+    input_mode.idx <- which(xmlSApply(eppSet, xmlAttrs) == "dataInputMode")
+    if(length(input_mode.idx) && xmlSize(eppSet[[input_mode.idx]][[1]]))
+      input_mode <- xmlToList(eppSet[[input_mode.idx]][[1]])[["string"]]
+    
+    if(length(pmtctdata.idx) && input_mode == "ANC"){
       ancrtsite.prev <- matrix(NA, nsites, nANCyears, dimnames=list(siteNames, 1985+0:(nANCyears-1)))
       for(clinic.idx in 1:nsites){
         clinic <- eppSet[[pmtctdata.idx]][["array"]][[clinic.idx]][[1]]
@@ -267,7 +278,7 @@ read_epp_data <- function(pjnz){
     pmtctcensdata.idx <- which(xmlSApply(eppSet, xmlAttrs) == "censusPMTCTSurvData")
     pmtctcenssamplesizes.idx <- which(xmlSApply(eppSet, xmlAttrs) == "censusPMTCTSampleSizes")
 
-    if(length(pmtctcensdata.idx)){
+    if(length(pmtctcensdata.idx) && input_mode == "ANC"){
       ancrtcens.prev <- setNames(numeric(nANCyears), 1985+0:(nANCyears-1))
       obj <- eppSet[[pmtctcensdata.idx]][[1]]
       idx <- as.integer(xmlSApply(obj, xmlAttrs)) + 1

@@ -12,3 +12,7 @@
 # epp 0.3.2
 
 - IMIS offsets likelihood by maximum log-likelihood to avoid underflow
+
+# epp 0.3.3
+
+- Only read ANC-RT data if used in EPP fit
