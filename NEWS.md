@@ -11,7 +11,8 @@
 
 # epp 0.3.2
 
-- IMIS offsets likelihood by maximum log-likelihood to avoid underflow
+- ~~IMIS offsets likelihood by maximum log-likelihood to avoid underflow.~~  Rolled this back because it introduced a pernicious little bug in mixture weights when offset changes numerical underflow. Should be re-implemented more carefully later.
+- Added option to likelihood() to return log values.
 
 # epp 0.3.3
 

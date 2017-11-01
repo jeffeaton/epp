@@ -13,7 +13,7 @@ IMIS <- function(B0, B, B.re, number_k, D=0, opt_iter=0, fp, likdat,
   Sig2_global = cov(X_all[1:B0,])        # the prior covariance
   stat_all = matrix(NA, 6, number_k)                            # 6 diagnostic statistics at each iteration
   center_all = NULL                                             # centers of Gaussian components
-  prior_all = like_all = ll_all = gaussian_sum = vector("numeric", B0 + B*(D*opt_iter+number_k))
+  prior_all = like_all = gaussian_sum = vector("numeric", B0 + B*(D*opt_iter+number_k))
   sigma_all = list()                                            # covariance matrices of Gaussian components
 
 
@@ -25,9 +25,7 @@ IMIS <- function(B0, B, B.re, number_k, D=0, opt_iter=0, fp, likdat,
     ptm.like = proc.time()
 
     prior_all[n_all + 1:dim(X_k)[1]] <-  prior(X_k, fp)
-    ll_all[n_all + 1:dim(X_k)[1]] <-  likelihood(X_k, fp, likdat, log=TRUE)
-    offset_ll <- max(ll_all[(seq_len(n_all+nrow(X_k)))]) - 400
-    like_all[seq_len(n_all+nrow(X_k))] <- exp(ll_all[seq_len(n_all+nrow(X_k))] - offset_ll)  # scaled likelihood
+    like_all[n_all + 1:dim(X_k)[1]] <-  likelihood(X_k, fp, likdat)
     ptm.use = (proc.time() - ptm.like)[3]
     if (k==1)   print(paste(B0, "likelihoods are evaluated in", round(ptm.use/60,2), "minutes"))
     which_pos <- which(like_all[1:(n_all + dim(X_k)[1])] > 0)
@@ -55,7 +53,7 @@ IMIS <- function(B0, B, B.re, number_k, D=0, opt_iter=0, fp, likdat,
 
     Weights = prior_all[which_pos]*like_all[which_pos]/ envelop_pos  # importance weight is determined by the posterior density divided by the sampling density
 
-    stat_all[1,k] = log(mean(Weights)*length(which_pos)/(n_all+dim(X_k)[1])) + offset_ll           # the raw marginal likelihood (adding back offset)
+    stat_all[1,k] = log(mean(Weights)*length(which_pos)/(n_all+dim(X_k)[1]))                  # the raw marginal likelihood
     Weights = Weights / sum(Weights)
     stat_all[2,k] = sum(1-(1-Weights)^B.re)             # the expected number of unique points
     stat_all[3,k] = max(Weights)                                # the maximum weight
