@@ -305,14 +305,12 @@ read_epp_data <- function(pjnz){
 
     hhsUsed.idx <- which(xmlSApply(eppSet, xmlAttrs) == "surveyIsUsed")
     hhsHIV.idx <- which(xmlSApply(eppSet, xmlAttrs) == "surveyHIV")
-    hhsSampleSize.idx <- which(xmlSApply(eppSet, xmlAttrs) == "surveySampleSize")
     hhsSE.idx <- which(xmlSApply(eppSet, xmlAttrs) == "surveyStandardError")
     hhsYear.idx <- which(xmlSApply(eppSet, xmlAttrs) == "surveyYears")
 
     nhhs <- max(xmlSize(eppSet[[hhsYear.idx]][[1]]),
                 xmlSize(eppSet[[hhsHIV.idx]][[1]]),
                 xmlSize(eppSet[[hhsSE.idx]][[1]]),
-                xmlSize(eppSet[[hhsSampleSize.idx]][[1]]),
                 xmlSize(eppSet[[hhsUsed.idx]][[1]]))
 
     hhs <- data.frame(year = rep(NA, nhhs), prev = rep(NA, nhhs), se = rep(NA, nhhs), n = rep(NA, nhhs), used = rep(NA, nhhs))
@@ -320,7 +318,6 @@ read_epp_data <- function(pjnz){
     hhs$year[as.integer(xmlSApply(eppSet[[hhsYear.idx]][[1]], xmlAttrs))+1] <- as.numeric(xmlSApply(eppSet[[hhsYear.idx]][[1]], xmlSApply, xmlToList, FALSE))
     hhs$prev[as.integer(xmlSApply(eppSet[[hhsHIV.idx]][[1]], xmlAttrs))+1] <- as.numeric(xmlSApply(eppSet[[hhsHIV.idx]][[1]], xmlSApply, xmlToList, FALSE))/100
     hhs$se[as.integer(xmlSApply(eppSet[[hhsSE.idx]][[1]], xmlAttrs))+1] <- as.numeric(xmlSApply(eppSet[[hhsSE.idx]][[1]], xmlSApply, xmlToList, FALSE))/100
-    hhs$n[as.integer(xmlSApply(eppSet[[hhsSampleSize.idx]][[1]], xmlAttrs))+1] <- as.numeric(xmlSApply(eppSet[[hhsSampleSize.idx]][[1]], xmlSApply, xmlToList, FALSE))
     hhs$used[as.integer(xmlSApply(eppSet[[hhsUsed.idx]][[1]], xmlAttrs))+1] <- as.logical(xmlSApply(eppSet[[hhsUsed.idx]][[1]], xmlSApply, xmlToList, FALSE))
 
     hhs <- subset(hhs, !is.na(prev))
