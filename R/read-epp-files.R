@@ -163,22 +163,18 @@ read_epp_input <- function(pjnz){
 ####  Function to read prevalence data used in EPP fitting (from .xml)  ####
 ############################################################################
 
+#' @import xml2
 read_epp_data <- function(pjnz){
-
   xmlfile <- grep(".xml", unzip(pjnz, list=TRUE)$Name, value=TRUE)
+
   con <- unz(pjnz, xmlfile)
-  epp.xml <- scan(con, "character", sep="\n")
-  close(con)
+  epp.xml <- read_xml(con)
 
-  if (!require("XML", quietly = TRUE))
-    stop("read_epp_data() requires the package 'XML'. Please install it.", call. = FALSE)
-      
-  obj <- xmlTreeParse(epp.xml)
+  r <- xml_children(xml_child(epp.xml))
+  names(r) <- xml_attr(r, "property")
 
-  r <- xmlRoot(obj)[[1]]
-  eppSetChildren.idx <- which(xmlSApply(r, xmlAttrs) == "eppSetChildren")
-  country <- xmlToList(r[[which(xmlSApply(r, xmlAttrs) == "worksetCountry")]][[1]])
-  country_code <- xmlToList(r[[which(xmlSApply(r, xmlAttrs) == "countryCode")]][[1]])
+  country <- xml_text(r[["worksetCountry"]])
+  country_code <- xml_integer(r[["countryCode"]])
 
   epp.data <- list() # declare list to store output
   attr(epp.data, "country") <- country
@@ -188,137 +184,125 @@ read_epp_data <- function(pjnz){
   ## Defaults to "HSS mdoe", which is no ANC-RT data.
   input_mode <- "HSS"
 
-  for(eppSet.idx in 1:xmlSize(r[[eppSetChildren.idx]])){
+  for(eppSet in xml_children(r[["eppSetChildren"]])){
 
-    eppSet <- r[[eppSetChildren.idx]][[eppSet.idx]][[1]]
-    eppName <- xmlToList(eppSet[[which(xmlSApply(eppSet, xmlAttrs) == "name")]][["string"]])
+    eppSet <- xml_children(xml_child(eppSet))
+    names(eppSet) <- xml_attr(eppSet, "property")
+
+    eppName <- xml_text(eppSet[["name"]])
 
     ##  ANC data  ##
 
-    siteNames.idx <- which(xmlSApply(eppSet, xmlAttrs) == "siteNames")
-    siteSelected.idx <- which(xmlSApply(eppSet, xmlAttrs) == "siteSelected")
-    survData.idx <- which(xmlSApply(eppSet, xmlAttrs) == "survData")
-    survSampleSizes.idx <- which(xmlSApply(eppSet, xmlAttrs) == "survSampleSizes")
-
-
-    siteNames <- xmlSApply(eppSet[[siteNames.idx]][[1]], xmlSApply, xmlToList, FALSE)
-    siteIdx <- as.numeric(xmlSApply(eppSet[[siteNames.idx]][[1]], xmlAttrs)) ## 0 based
-
+    siteNames <- unlist(as_list(eppSet[["siteNames"]])[[1]])
+    siteIdx <- as.integer(sapply(as_list(eppSet[["siteNames"]])[[1]], attr, "index")) # 0 based
     nsites <- length(siteNames)
-    nANCyears <- max(as.integer(xmlSApply(eppSet[[survData.idx]][["array"]][[1]][[1]], xmlAttrs))) + 1
+
+    survData <- as_list(eppSet[["survData"]])[[1]]
+    survSampleSizes <- as_list(eppSet[["survSampleSizes"]])[[1]]
+    siteSelected <- as_list(eppSet[["siteSelected"]])[[1]]
 
     ## ANC site used
     anc.used <- rep(FALSE, nsites)
-    anc.used[as.integer(xmlSApply(eppSet[[siteSelected.idx]][[1]], xmlAttrs)) + 1] <- as.logical(xmlSApply(eppSet[[siteSelected.idx]][[1]], xmlSApply, xmlToList, FALSE))
+    anc.used[as.integer(sapply(siteSelected, attr, "index")) + 1L] <- as.logical(unlist(siteSelected))
 
     ## ANC prevalence
-    anc.prev <- matrix(NA, nsites, nANCyears)
-    rownames(anc.prev) <- siteNames
-    colnames(anc.prev) <- 1985+0:(nANCyears-1)
-    for(clinic.idx in 1:nsites){
-      clinic <- eppSet[[survData.idx]][["array"]][[clinic.idx]][[1]]
-      prev <- as.numeric(xmlSApply(clinic, xmlSApply, xmlToList, FALSE))
-      idx <- as.integer(xmlSApply(clinic, xmlAttrs)) + 1
-      anc.prev[clinic.idx, idx] <- prev
-    }
-    anc.prev[is.na(anc.prev)] <- 0.0 ## NOTE: appears that if value is 0.0, the array index is omitted from XML file, might apply elsewhere.
+
+    prev <- lapply(lapply(survData, unlist), as.numeric)
+    idx <- lapply(survData, function(x) as.integer(sapply(x[[1]], attr, "index"))+1L)
+    anc.prev <- matrix(NA, nsites, max(unlist(idx)),
+                       dimnames=list(site=siteNames, year=1985+0:(max(unlist(idx))-1)))
+    for(i in 1:nsites)
+      anc.prev[i, idx[[i]]] <- prev[[i]]
+    anc.prev[is.na(anc.prev)] <- 0.0 # NOTE: appears that if value is 0.0, the array index is omitted from XML file, might apply elsewhere.
     anc.prev[anc.prev == -1] <- NA
     anc.prev <- anc.prev/100
 
     ## ANC sample sizes
-    anc.n <- matrix(NA, nsites, nANCyears)
-    rownames(anc.n) <- siteNames
-    colnames(anc.n) <- 1985+0:(nANCyears-1)
-    for(clinic.idx in 1:nsites){
-      clinic <- eppSet[[survSampleSizes.idx]][["array"]][[clinic.idx]][[1]]
-      n <- as.numeric(xmlSApply(clinic, xmlSApply, xmlToList, FALSE))
-      idx <- as.integer(xmlSApply(clinic, xmlAttrs)) + 1
-      anc.n[clinic.idx, idx] <- n
-    }
+    n <- lapply(lapply(survSampleSizes, unlist), as.numeric)
+    idx <- lapply(survSampleSizes, function(x) as.integer(sapply(x[[1]], attr, "index"))+1L)
+    anc.n <- matrix(NA, nsites, max(unlist(idx)),
+                    dimnames=list(site=siteNames, year=1985+0:(max(unlist(idx))-1)))
+    for(i in 1:nsites)
+      anc.n[i, idx[[i]]] <- n[[i]]
+    anc.n[is.na(anc.n)] <- 0.0
     anc.n[anc.n == -1] <- NA
 
 
     ## ANC-RT site level
 
-    pmtctdata.idx <- which(xmlSApply(eppSet, xmlAttrs) == "PMTCTData")
-    pmtctsitesamplesizes.idx <- which(xmlSApply(eppSet, xmlAttrs) == "PMTCTSiteSampleSizes")
+    if(length(eppSet[["dataInputMode"]]) &&
+       length(as_list(eppSet[["dataInputMode"]])[[1]]))
+      input_mode <- as_list(eppSet[["dataInputMode"]])[[1]]$string[[1]]
 
-    input_mode.idx <- which(xmlSApply(eppSet, xmlAttrs) == "dataInputMode")
-    if(length(input_mode.idx) && xmlSize(eppSet[[input_mode.idx]][[1]]))
-      input_mode <- xmlToList(eppSet[[input_mode.idx]][[1]])[["string"]]
-    
-    if(length(pmtctdata.idx) && input_mode == "ANC"){
-      ancrtsite.prev <- matrix(NA, nsites, nANCyears, dimnames=list(siteNames, 1985+0:(nANCyears-1)))
-      for(clinic.idx in 1:nsites){
-        clinic <- eppSet[[pmtctdata.idx]][["array"]][[clinic.idx]][[1]]
-        prev <- as.numeric(xmlSApply(clinic, xmlSApply, xmlToList, FALSE))
-        idx <- as.integer(xmlSApply(clinic, xmlAttrs)) + 1
-        ancrtsite.prev[clinic.idx, idx] <- prev
-      }
-      ancrtsite.prev[is.na(ancrtsite.prev)] <- 0.0 
+    if(length(eppSet[["PMTCTData"]]) && input_mode == "ANC"){
+
+      pmtctData <- as_list(eppSet[["PMTCTData"]])[[1]]
+      prev <- lapply(lapply(pmtctData, unlist), as.numeric)
+      idx <- lapply(pmtctData, function(x) as.integer(sapply(x[[1]], attr, "index"))+1L)
+      ancrtsite.prev <- matrix(NA, nsites, max(unlist(idx)),
+                           dimnames=list(site=siteNames, year=1985+0:(max(unlist(idx))-1)))
+      for(i in 1:nsites)
+        ancrtsite.prev[i, idx[[i]]] <- prev[[i]]
+      ancrtsite.prev[is.na(ancrtsite.prev)] <- 0.0
       ancrtsite.prev[ancrtsite.prev == -1] <- NA
       ancrtsite.prev <- ancrtsite.prev/100
 
-      ancrtsite.n <- matrix(NA, nsites, nANCyears, dimnames=list(siteNames, 1985+0:(nANCyears-1)))
-      for(clinic.idx in 1:nsites){
-        clinic <- eppSet[[pmtctsitesamplesizes.idx]][["array"]][[clinic.idx]][[1]]
-        n <- as.numeric(xmlSApply(clinic, xmlSApply, xmlToList, FALSE))
-        idx <- as.integer(xmlSApply(clinic, xmlAttrs)) + 1
-        ancrtsite.n[clinic.idx, idx] <- n
-      }
+      pmtctSampleSizes <- as_list(eppSet[["PMTCTSiteSampleSizes"]])[[1]]
+      n <- lapply(lapply(pmtctSampleSizes, unlist), as.numeric)
+      idx <- lapply(pmtctSampleSizes, function(x) as.integer(sapply(x[[1]], attr, "index"))+1L)
+      ancrtsite.n <- matrix(NA, nsites, max(unlist(idx)),
+                        dimnames=list(site=siteNames, year=1985+0:(max(unlist(idx))-1)))
+      for(i in 1:nsites)
+        ancrtsite.n[i, idx[[i]]] <- n[[i]]
+      ancrtsite.n[is.na(ancrtsite.n)] <- 0.0
       ancrtsite.n[ancrtsite.n == -1] <- NA
+
     } else {
       ancrtsite.prev <- NULL
       ancrtsite.n <- NULL
     }
-      
-    
+
+
     ## ANC-RT census level
-
-    pmtctcensdata.idx <- which(xmlSApply(eppSet, xmlAttrs) == "censusPMTCTSurvData")
-    pmtctcenssamplesizes.idx <- which(xmlSApply(eppSet, xmlAttrs) == "censusPMTCTSampleSizes")
-
-    if(length(pmtctcensdata.idx) && input_mode == "ANC"){
-      ancrtcens.prev <- setNames(numeric(nANCyears), 1985+0:(nANCyears-1))
-      obj <- eppSet[[pmtctcensdata.idx]][[1]]
-      idx <- as.integer(xmlSApply(obj, xmlAttrs)) + 1
-      ancrtcens.prev[idx] <- as.numeric(xmlSApply(obj, xmlSApply, xmlToList, FALSE))
-      ancrtcens.prev[is.na(ancrtcens.prev)] <- 0.0 
+    if(length(eppSet[["censusPMTCTSurvData"]]) && input_mode == "ANC"){
+      idx <- as.integer(sapply(as_list(eppSet[["censusPMTCTSurvData"]])[[1]], attr, "index")) + 1L
+      ancrtcens.prev <- setNames(numeric(max(idx)), 1985+0:(max(idx)-1))
+      ancrtcens.prev[idx] <- as.numeric(unlist(as_list(eppSet[["censusPMTCTSurvData"]])[[1]]))
+      ancrtcens.prev[is.na(ancrtcens.prev)] <- 0.0
       ancrtcens.prev[ancrtcens.prev == -1] <- NA
       ancrtcens.prev <- ancrtcens.prev/100
 
-      ancrtcens.n <- setNames(numeric(nANCyears), 1985+0:(nANCyears-1))
-      obj <- eppSet[[pmtctcenssamplesizes.idx]][[1]]
-      idx <- as.integer(xmlSApply(obj, xmlAttrs)) + 1
-      ancrtcens.n[idx] <- as.numeric(xmlSApply(obj, xmlSApply, xmlToList, FALSE))
-      ancrtcens.n[is.na(ancrtcens.n)] <- 0.0 
+      idx <- as.integer(sapply(as_list(eppSet[["censusPMTCTSampleSizes"]])[[1]], attr, "index")) + 1L
+      ancrtcens.n <- setNames(numeric(max(idx)), 1985+0:(max(idx)-1))
+      ancrtcens.n[idx] <- as.numeric(unlist(as_list(eppSet[["censusPMTCTSampleSizes"]])[[1]]))
+      ancrtcens.n[is.na(ancrtcens.n)] <- 0.0
       ancrtcens.n[ancrtcens.n == -1] <- NA
-      ancrtcens <- data.frame(year=as.integer(names(ancrtcens.prev)), prev=ancrtcens.prev, n=ancrtcens.n)
+
+      ancrtcens <- data.frame(year=as.integer(names(ancrtcens.prev)),
+                              prev=ancrtcens.prev, n=ancrtcens.n)
       ancrtcens <- subset(ancrtcens, !is.na(prev) | !is.na(n))
     } else {
       ancrtcens <- NULL
     }
 
-    
-    
+
     ##  HH surveys  ##
 
-    hhsUsed.idx <- which(xmlSApply(eppSet, xmlAttrs) == "surveyIsUsed")
-    hhsHIV.idx <- which(xmlSApply(eppSet, xmlAttrs) == "surveyHIV")
-    hhsSE.idx <- which(xmlSApply(eppSet, xmlAttrs) == "surveyStandardError")
-    hhsYear.idx <- which(xmlSApply(eppSet, xmlAttrs) == "surveyYears")
+    nhhs <- max(as.integer(xml_attr(xml_child(eppSet[["surveyIsUsed"]]), "length")),
+                as.integer(xml_attr(xml_child(eppSet[["surveyHIV"]]), "length")),
+                as.integer(xml_attr(xml_child(eppSet[["surveyStandardError"]]), "length")),
+                as.integer(xml_attr(xml_child(eppSet[["surveyYears"]]), "length")))
 
-    nhhs <- max(xmlSize(eppSet[[hhsYear.idx]][[1]]),
-                xmlSize(eppSet[[hhsHIV.idx]][[1]]),
-                xmlSize(eppSet[[hhsSE.idx]][[1]]),
-                xmlSize(eppSet[[hhsUsed.idx]][[1]]))
+    hhs <- data.frame(year = rep(NA, nhhs),
+                      prev = rep(NA, nhhs),
+                      se = rep(NA, nhhs),
+                      n = rep(NA, nhhs),
+                      used = rep(NA, nhhs))
 
-    hhs <- data.frame(year = rep(NA, nhhs), prev = rep(NA, nhhs), se = rep(NA, nhhs), n = rep(NA, nhhs), used = rep(NA, nhhs))
-
-    hhs$year[as.integer(xmlSApply(eppSet[[hhsYear.idx]][[1]], xmlAttrs))+1] <- as.numeric(xmlSApply(eppSet[[hhsYear.idx]][[1]], xmlSApply, xmlToList, FALSE))
-    hhs$prev[as.integer(xmlSApply(eppSet[[hhsHIV.idx]][[1]], xmlAttrs))+1] <- as.numeric(xmlSApply(eppSet[[hhsHIV.idx]][[1]], xmlSApply, xmlToList, FALSE))/100
-    hhs$se[as.integer(xmlSApply(eppSet[[hhsSE.idx]][[1]], xmlAttrs))+1] <- as.numeric(xmlSApply(eppSet[[hhsSE.idx]][[1]], xmlSApply, xmlToList, FALSE))/100
-    hhs$used[as.integer(xmlSApply(eppSet[[hhsUsed.idx]][[1]], xmlAttrs))+1] <- as.logical(xmlSApply(eppSet[[hhsUsed.idx]][[1]], xmlSApply, xmlToList, FALSE))
+    hhs$year[as.integer(xml_attr(xml_children(xml_child(eppSet[["surveyYears"]])), "index"))+1L] <- as.numeric(unlist(as_list(eppSet[["surveyYears"]])))
+    hhs$prev[as.integer(xml_attr(xml_children(xml_child(eppSet[["surveyHIV"]])), "index"))+1L] <- as.numeric(unlist(as_list(eppSet[["surveyHIV"]]))) / 100
+    hhs$se[as.integer(xml_attr(xml_children(xml_child(eppSet[["surveyStandardError"]])), "index"))+1L] <- as.numeric(unlist(as_list(eppSet[["surveyStandardError"]]))) / 100
+    hhs$used[as.integer(xml_attr(xml_children(xml_child(eppSet[["surveyIsUsed"]])), "index"))+1L] <- as.logical(unlist(as_list(eppSet[["surveyIsUsed"]])))
 
     hhs <- subset(hhs, !is.na(prev))
 
@@ -349,6 +333,9 @@ read_epp_subpops <- function(pjnz){
   con <- unz(pjnz, xmlfile)
   epp.xml <- scan(con, "character", sep="\n")
   close(con)
+
+  if (!require("XML", quietly = TRUE))
+    stop("read_epp_subpops() requires the package 'XML'. Please install it.", call. = FALSE)
 
   obj <- xmlTreeParse(epp.xml)
   r <- xmlRoot(obj)[[1]]

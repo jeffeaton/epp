@@ -1,6 +1,6 @@
 Package: epp
 Title: R Implementation of the EPP model for HIV epidemic estimates.
-Version: 0.3.3
+Version: 0.4.0
 Authors@R: person("Jeff", "Eaton", email = "jeffrey.eaton@imperial.ac.uk", role = c("aut", "cre"))
 Description: This implements the EPP r-spline and r-trend models for HIV epidemic estimates.
 Depends: R (>= 3.1.0)
@@ -8,5 +8,6 @@ License: GPL-3
 Encoding: UTF-8
 LazyData: true
 Imports: mvtnorm,
-    anclik (>= 0.3)
+    anclik (>= 0.3),
+    xml2
 Suggests: XML
