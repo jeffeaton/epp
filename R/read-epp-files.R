@@ -159,12 +159,77 @@ read_epp_input <- function(pjnz){
 }
 
 
-############################################################################
-####  Function to read prevalence data used in EPP fitting (from .xml)  ####
-############################################################################
-
+#' Parse java array from EPP .xml file
+#' 
+#' @param x `xml_node` object with tag 'array'
 #' @import xml2
+.parse_array <- function(x){
+
+  a_length <- as.integer(xml_attr(x, "length"))
+  a_mode <- switch(xml_attr(x, "class"),
+                   int = "integer",
+                   double = "numeric",
+                   boolean = "logical",
+                   java.lang.String = "character")
+  arr <- vector(a_mode, a_length)
+
+  ## Note: default declaration will be 0 for a_mode \in {integer, numeric},
+  ##       FALSE for a_mode = logical, and "" for a_mode = character. This
+  ##       matches the java array defaults in which indices are omitted for
+  ##       these values.
+  
+  elem <- xml_children(x)
+  idx <- as.integer(xml_attr(elem, "index")) + 1L # java is 0-based
+  fn <- switch(a_mode,
+               integer = xml_integer,
+               numeric = xml_double,
+               logical = function(xx) as.logical(xml_text(elem)),
+               character = xml_text)
+  arr[idx] <- fn(elem)
+
+  return(arr)
+}
+
+
+#' Parse java matrix from EPP .xml file
+#' 
+#' @param x `xml_node` object with tag 'array' and type '[D' or '[I'
+#' @import xml2
+.parse_matrix <- function(x){
+
+  if(!xml_attr(x, "class") %in% c("[D", "[I"))
+    stop("Tried to invoke .parse_matrix() on array node not of class '[D' or '[I]'.")
+
+  m_rows <- as.integer(xml_attr(x, "length"))
+  rows <- xml_children(x)
+  idx <- as.integer(xml_attr(rows, "index")) + 1L
+  rows <- lapply(xml_find_first(rows, "array"), .parse_array)
+
+  m_cols <- length(rows[[1]])
+  if(!all(sapply(rows, length) == m_cols))
+    stop("Not all rows are same length. This might be a ragged array.")
+
+  mat <- matrix(nrow = m_rows, ncol=m_cols)
+  for(i in seq_along(rows))
+    mat[idx[i],] <- rows[[i]]
+
+  return(mat)
+}
+
+
+#' Read EPP fitting surveillance data
+#'
+#' Reads the HIV prevalence from sentinel surveillance and household surveillance
+#' data from the EPP .xml file within a PJNZ.
+#'
+#' @details
+#' The XML tree structure is slightly different for EPP worksets created with
+#' the 'concentrated' epidemic template. The 
+#' 
+#' @import xml2
+#' @export
 read_epp_data <- function(pjnz){
+
   xmlfile <- grep(".xml", unzip(pjnz, list=TRUE)$Name, value=TRUE)
 
   con <- unz(pjnz, xmlfile)
@@ -184,77 +249,52 @@ read_epp_data <- function(pjnz){
   ## Defaults to "HSS mdoe", which is no ANC-RT data.
   input_mode <- "HSS"
 
-  for(eppSet in xml_children(r[["eppSetChildren"]])){
+  obj <- xml_find_all(r, ".//object")
+  projsets <- obj[which(xml_attr(obj, "class") == "epp2011.core.sets.ProjectionSet")]
+  
+  for(eppSet in projsets){
 
-    eppSet <- xml_children(xml_child(eppSet))
+    projset_id <- as.integer(gsub("[^0-9]", "", xml_attr(eppSet, "id")))
+    
+    eppSet <- xml_children(eppSet)
     names(eppSet) <- xml_attr(eppSet, "property")
 
     eppName <- xml_text(eppSet[["name"]])
 
     ##  ANC data  ##
 
-    siteNames <- unlist(as_list(eppSet[["siteNames"]])[[1]])
-    siteIdx <- as.integer(sapply(as_list(eppSet[["siteNames"]])[[1]], attr, "index")) # 0 based
+    siteNames <- .parse_array(xml_find_first(eppSet[["siteNames"]], "array"))
     nsites <- length(siteNames)
 
-    survData <- as_list(eppSet[["survData"]])[[1]]
-    survSampleSizes <- as_list(eppSet[["survSampleSizes"]])[[1]]
-    siteSelected <- as_list(eppSet[["siteSelected"]])[[1]]
-
     ## ANC site used
-    anc.used <- rep(FALSE, nsites)
-    anc.used[as.integer(sapply(siteSelected, attr, "index")) + 1L] <- as.logical(unlist(siteSelected))
+    anc.used <- .parse_array(xml_find_first(eppSet[["siteSelected"]], "array"))
 
     ## ANC prevalence
-
-    prev <- lapply(lapply(survData, unlist), as.numeric)
-    idx <- lapply(survData, function(x) as.integer(sapply(x[[1]], attr, "index"))+1L)
-    anc.prev <- matrix(NA, nsites, max(unlist(idx)),
-                       dimnames=list(site=siteNames, year=1985+0:(max(unlist(idx))-1)))
-    for(i in 1:nsites)
-      anc.prev[i, idx[[i]]] <- prev[[i]]
-    anc.prev[is.na(anc.prev)] <- 0.0 # NOTE: appears that if value is 0.0, the array index is omitted from XML file, might apply elsewhere.
+    anc.prev <- .parse_matrix(xml_find_first(eppSet[["survData"]], "array"))
+    dimnames(anc.prev) <- list(site=siteNames, year=1985+0:(ncol(anc.prev)-1))
     anc.prev[anc.prev == -1] <- NA
     anc.prev <- anc.prev/100
 
     ## ANC sample sizes
-    n <- lapply(lapply(survSampleSizes, unlist), as.numeric)
-    idx <- lapply(survSampleSizes, function(x) as.integer(sapply(x[[1]], attr, "index"))+1L)
-    anc.n <- matrix(NA, nsites, max(unlist(idx)),
-                    dimnames=list(site=siteNames, year=1985+0:(max(unlist(idx))-1)))
-    for(i in 1:nsites)
-      anc.n[i, idx[[i]]] <- n[[i]]
-    anc.n[is.na(anc.n)] <- 0.0
+    anc.n <- .parse_matrix(xml_find_first(eppSet[["survSampleSizes"]], "array"))
+    dimnames(anc.n) <- list(site=siteNames, year=1985+0:(ncol(anc.n)-1))
     anc.n[anc.n == -1] <- NA
-
 
     ## ANC-RT site level
 
     if(length(eppSet[["dataInputMode"]]) &&
-       length(as_list(eppSet[["dataInputMode"]])[[1]]))
-      input_mode <- as_list(eppSet[["dataInputMode"]])[[1]]$string[[1]]
+       length(xml_find_first(eppSet[["dataInputMode"]], ".//string")))
+      input_mode <- xml_text(xml_find_first(eppSet[["dataInputMode"]], ".//string"))
 
     if(length(eppSet[["PMTCTData"]]) && input_mode == "ANC"){
 
-      pmtctData <- as_list(eppSet[["PMTCTData"]])[[1]]
-      prev <- lapply(lapply(pmtctData, unlist), as.numeric)
-      idx <- lapply(pmtctData, function(x) as.integer(sapply(x[[1]], attr, "index"))+1L)
-      ancrtsite.prev <- matrix(NA, nsites, max(unlist(idx)),
-                           dimnames=list(site=siteNames, year=1985+0:(max(unlist(idx))-1)))
-      for(i in 1:nsites)
-        ancrtsite.prev[i, idx[[i]]] <- prev[[i]]
-      ancrtsite.prev[is.na(ancrtsite.prev)] <- 0.0
+      ancrtsite.prev <- .parse_matrix(xml_find_first(eppSet[["PMTCTData"]], "array"))
+      dimnames(ancrtsite.prev) <- list(site=siteNames, year=1985+0:(ncol(ancrtsite.prev)-1))
       ancrtsite.prev[ancrtsite.prev == -1] <- NA
       ancrtsite.prev <- ancrtsite.prev/100
 
-      pmtctSampleSizes <- as_list(eppSet[["PMTCTSiteSampleSizes"]])[[1]]
-      n <- lapply(lapply(pmtctSampleSizes, unlist), as.numeric)
-      idx <- lapply(pmtctSampleSizes, function(x) as.integer(sapply(x[[1]], attr, "index"))+1L)
-      ancrtsite.n <- matrix(NA, nsites, max(unlist(idx)),
-                        dimnames=list(site=siteNames, year=1985+0:(max(unlist(idx))-1)))
-      for(i in 1:nsites)
-        ancrtsite.n[i, idx[[i]]] <- n[[i]]
-      ancrtsite.n[is.na(ancrtsite.n)] <- 0.0
+      ancrtsite.n <- .parse_matrix(xml_find_first(eppSet[["PMTCTSiteSampleSizes"]], "array"))
+      dimnames(ancrtsite.n) <- list(site=siteNames, year=1985+0:(ncol(ancrtsite.n)-1))      
       ancrtsite.n[ancrtsite.n == -1] <- NA
 
     } else {
@@ -265,19 +305,15 @@ read_epp_data <- function(pjnz){
 
     ## ANC-RT census level
     if(length(eppSet[["censusPMTCTSurvData"]]) && input_mode == "ANC"){
-      idx <- as.integer(sapply(as_list(eppSet[["censusPMTCTSurvData"]])[[1]], attr, "index")) + 1L
-      ancrtcens.prev <- setNames(numeric(max(idx)), 1985+0:(max(idx)-1))
-      ancrtcens.prev[idx] <- as.numeric(unlist(as_list(eppSet[["censusPMTCTSurvData"]])[[1]]))
-      ancrtcens.prev[is.na(ancrtcens.prev)] <- 0.0
+
+      ancrtcens.prev <- .parse_array(xml_find_first(eppSet[["censusPMTCTSurvData"]], "array"))
+      names(ancrtcens.prev) <- 1985+0:(length(ancrtcens.prev)-1)
       ancrtcens.prev[ancrtcens.prev == -1] <- NA
       ancrtcens.prev <- ancrtcens.prev/100
-
-      idx <- as.integer(sapply(as_list(eppSet[["censusPMTCTSampleSizes"]])[[1]], attr, "index")) + 1L
-      ancrtcens.n <- setNames(numeric(max(idx)), 1985+0:(max(idx)-1))
-      ancrtcens.n[idx] <- as.numeric(unlist(as_list(eppSet[["censusPMTCTSampleSizes"]])[[1]]))
-      ancrtcens.n[is.na(ancrtcens.n)] <- 0.0
+      
+      ancrtcens.n <- .parse_array(xml_find_first(eppSet[["censusPMTCTSampleSizes"]], "array"))
       ancrtcens.n[ancrtcens.n == -1] <- NA
-
+      
       ancrtcens <- data.frame(year=as.integer(names(ancrtcens.prev)),
                               prev=ancrtcens.prev, n=ancrtcens.n)
       ancrtcens <- subset(ancrtcens, !is.na(prev) | !is.na(n))
@@ -288,26 +324,17 @@ read_epp_data <- function(pjnz){
 
     ##  HH surveys  ##
 
-    nhhs <- max(as.integer(xml_attr(xml_child(eppSet[["surveyIsUsed"]]), "length")),
-                as.integer(xml_attr(xml_child(eppSet[["surveyHIV"]]), "length")),
-                as.integer(xml_attr(xml_child(eppSet[["surveyStandardError"]]), "length")),
-                as.integer(xml_attr(xml_child(eppSet[["surveyYears"]]), "length")))
-
-    hhs <- data.frame(year = rep(NA, nhhs),
-                      prev = rep(NA, nhhs),
-                      se = rep(NA, nhhs),
-                      n = rep(NA, nhhs),
-                      used = rep(NA, nhhs))
-
-    hhs$year[as.integer(xml_attr(xml_children(xml_child(eppSet[["surveyYears"]])), "index"))+1L] <- as.numeric(unlist(as_list(eppSet[["surveyYears"]])))
-    hhs$prev[as.integer(xml_attr(xml_children(xml_child(eppSet[["surveyHIV"]])), "index"))+1L] <- as.numeric(unlist(as_list(eppSet[["surveyHIV"]]))) / 100
-    hhs$se[as.integer(xml_attr(xml_children(xml_child(eppSet[["surveyStandardError"]])), "index"))+1L] <- as.numeric(unlist(as_list(eppSet[["surveyStandardError"]]))) / 100
-    hhs$used[as.integer(xml_attr(xml_children(xml_child(eppSet[["surveyIsUsed"]])), "index"))+1L] <- as.logical(unlist(as_list(eppSet[["surveyIsUsed"]])))
-
-    hhs <- subset(hhs, !is.na(prev))
+    hhs <- data.frame(year = .parse_array(xml_find_first(eppSet[["surveyYears"]], "array")),
+                      prev = .parse_array(xml_find_first(eppSet[["surveyHIV"]], "array"))/100,
+                      se = .parse_array(xml_find_first(eppSet[["surveyStandardError"]], "array"))/100,
+                      n = NA,
+                      used = .parse_array(xml_find_first(eppSet[["surveyIsUsed"]], "array")))
+    
+    hhs <- subset(hhs, prev > 0 | used | se != 0.01)
 
     epp.data[[eppName]] <- list(country=country,
                                 region=eppName,
+                                projset_id = projset_id,
                                 anc.used=anc.used,
                                 anc.prev=anc.prev,
                                 anc.n=anc.n,
@@ -326,6 +353,7 @@ read_epp_data <- function(pjnz){
 ################################################################################
 ####  Function to read subpopulation sizes used in EPP fitting (from .xml)  ####
 ################################################################################
+
 
 read_epp_subpops <- function(pjnz){
 
