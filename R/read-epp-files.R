@@ -118,22 +118,14 @@ read_epp_input <- function(pjnz){
 
   ## XML (for epidemic start year)
 
-  xmlfile <- grep(".xml", unzip(pjnz, list=TRUE)$Name, value=TRUE)
-  con <- unz(pjnz, xmlfile)
-  epp.xml <- scan(con, "character", sep="\n")
-  close(con)
-
-  if (!require("XML", quietly = TRUE))
-    stop("read_epp_input() requires the package 'XML'. Please install it.", call. = FALSE)
-      
-  obj <- xmlTreeParse(epp.xml)
-  r <- xmlRoot(obj)[[1]]
+  r <- get_eppxml_workset(pjnz)
 
   ## Note: tag "epidemicStartYrVarR" doesn't appear to change...
   ## Use epidemic start from first EPP subpopulation fit
-  eppSetChildren.idx <- which(xmlSApply(r, xmlAttrs) == "eppSetChildren")
-  eppSet <- r[[eppSetChildren.idx]][[1]][[1]]
-  epidemic.start <- as.integer(xmlToList(eppSet[[which(xmlSApply(eppSet, xmlAttrs) == "priorT0vr")]][[1]]))
+  projsets <- xml_find_all(r, ".//object")
+  projsets <- projsets[which(xml_attr(projsets, "class") == "epp2011.core.sets.ProjectionSet")]
+  eppSet <- xml_children(projsets[1])
+  epidemic.start <- as.integer(xml_double(eppSet[which(xml_attr(eppSet, "property") == "priorT0vr")]))
   
   eppin <- list(start.year       = start.year,
                 stop.year        = stop.year,
@@ -158,6 +150,21 @@ read_epp_input <- function(pjnz){
   return(eppin)
 }
 
+#' Return workset with names from EPP .xml file
+#' 
+#' @param x `xml_node` object with tag 'array'
+#' @import xml2
+get_eppxml_workset <- function(pjnz){
+
+  xmlfile <- grep(".xml", unzip(pjnz, list=TRUE)$Name, value=TRUE)
+  con <- unz(pjnz, xmlfile)
+  epp.xml <- read_xml(con)
+  
+  r <- xml_children(xml_child(epp.xml))
+  names(r) <- xml_attr(r, "property")
+  
+  return(r)
+}
 
 #' Parse java array from EPP .xml file
 #' 
@@ -222,22 +229,19 @@ read_epp_input <- function(pjnz){
 #' Reads the HIV prevalence from sentinel surveillance and household surveillance
 #' data from the EPP .xml file within a PJNZ.
 #'
+#' @param pjnz file path to Spectrum PJNZ file.
+#'
 #' @details
-#' The XML tree structure is slightly different for EPP worksets created with
-#' the 'concentrated' epidemic template. The 
+#' EPP projection sets are identified in the .xml file by searching the XML tree
+#' for tag "object", and then selecting objects with "class" attribute equal to
+#' "epp2011.core.sets.ProjectionSet".
 #' 
 #' @import xml2
 #' @export
 read_epp_data <- function(pjnz){
 
-  xmlfile <- grep(".xml", unzip(pjnz, list=TRUE)$Name, value=TRUE)
-
-  con <- unz(pjnz, xmlfile)
-  epp.xml <- read_xml(con)
-
-  r <- xml_children(xml_child(epp.xml))
-  names(r) <- xml_attr(r, "property")
-
+  r <- get_eppxml_workset(pjnz)
+  
   country <- xml_text(r[["worksetCountry"]])
   country_code <- xml_integer(r[["countryCode"]])
 
@@ -350,74 +354,61 @@ read_epp_data <- function(pjnz){
 }
 
 
-################################################################################
-####  Function to read subpopulation sizes used in EPP fitting (from .xml)  ####
-################################################################################
-
+#' Read EPP subpopulation configuration
+#'
+#' Reads the subpopulation configuration and population sizes from the EPP .xml
+#' file within a PJNZ.
+#' 
+#' @param pjnz file path to Spectrum PJNZ file.
+#'
+#' @details
+#' EPP projection sets are identified in the .xml file by searching the XML tree
+#' for tag "object", and then selecting objects with "class" attribute equal to
+#' "epp2011.core.sets.ProjectionSet".
+#' 
+#' @import xml2
+#' @export
 
 read_epp_subpops <- function(pjnz){
 
-  xmlfile <- grep(".xml", unzip(pjnz, list=TRUE)$Name, value=TRUE)
-  con <- unz(pjnz, xmlfile)
-  epp.xml <- scan(con, "character", sep="\n")
-  close(con)
-
-  if (!require("XML", quietly = TRUE))
-    stop("read_epp_subpops() requires the package 'XML'. Please install it.", call. = FALSE)
-
-  obj <- xmlTreeParse(epp.xml)
-  r <- xmlRoot(obj)[[1]]
-  eppSetChildren.idx <- which(xmlSApply(r, xmlAttrs) == "eppSetChildren")
-  country <- xmlToList(r[[which(xmlSApply(r, xmlAttrs) == "worksetCountry")]][[1]])
-  country_code <- xmlToList(r[[which(xmlSApply(r, xmlAttrs) == "countryCode")]][[1]])
+  r <- get_eppxml_workset(pjnz)
 
   epp.pops <- list() # declare list to store output
-  attr(epp.pops, "country") <- country
-  attr(epp.pops, "country_code") <- country_code
+  attr(epp.pops, "country") <- xml_text(r[["worksetCountry"]])
+  attr(epp.pops, "country_code") <- xml_integer(r[["countryCode"]])
 
-  workset.startyear <- as.integer(xmlToList(r[[which(xmlSApply(r, xmlAttrs) == "worksetStartYear")]][[1]]))
-  workset.endyear <- as.integer(xmlToList(r[[which(xmlSApply(r, xmlAttrs) == "worksetEndYear")]][[1]]))
-  ## workset.popbaseyear <- as.integer(xmlToList(r[[which(xmlSApply(r, xmlAttrs) == "worksetPopBaseYear")]][[1]])) # not sure what this is...
+  startyear <- xml_integer(r[["worksetStartYear"]])
+  endyear <- xml_integer(r[["worksetEndYear"]])
+  popbaseyear <- xml_integer(r[["worksetPopBaseYear"]])
 
-  pop15to49.idx <- which(xmlSApply(r, xmlAttrs) == "pop15to49")
-  pop15.idx <- which(xmlSApply(r, xmlAttrs) == "pop15")
-  pop50.idx <- which(xmlSApply(r, xmlAttrs) == "pop50")
-  netMigration.idx <- which(xmlSApply(r, xmlAttrs) == "netMigration")
-
-  epp.pops$total <-  data.frame(year = workset.startyear:workset.endyear,
-                                pop15to49 = 0,
-                                pop15 = 0,
-                                pop50 = 0,
-                                netmigr = 0)
-  epp.pops$total$pop15to49[as.integer(xmlSApply(r[[pop15to49.idx]][[1]], xmlAttrs))+1] <- as.numeric(xmlSApply(r[[pop15to49.idx]][[1]], xmlSApply, xmlToList))
-  epp.pops$total$pop15[as.integer(xmlSApply(r[[pop15.idx]][[1]], xmlAttrs))+1] <- as.numeric(xmlSApply(r[[pop15.idx]][[1]], xmlSApply, xmlToList))
-  epp.pops$total$pop50[as.integer(xmlSApply(r[[pop50.idx]][[1]], xmlAttrs))+1] <- as.numeric(xmlSApply(r[[pop50.idx]][[1]], xmlSApply, xmlToList))
-  epp.pops$total$netmigr[as.integer(xmlSApply(r[[netMigration.idx]][[1]], xmlAttrs))+1] <- as.numeric(xmlSApply(r[[netMigration.idx]][[1]], xmlSApply, xmlToList))
-
+  epp.pops$total <-  data.frame(year = startyear:endyear,
+                                pop15to49 = .parse_array(xml_find_first(r[["pop15to49"]], "array")),
+                                pop15     = .parse_array(xml_find_first(r[["pop15"]], "array")),
+                                pop50     = .parse_array(xml_find_first(r[["pop50"]], "array")),
+                                netmigr   = .parse_array(xml_find_first(r[["netMigration"]], "array")))
+  
   epp.pops$subpops <- list()
 
-  for(eppSet.idx in 1:xmlSize(r[[eppSetChildren.idx]])){
+  obj <- xml_find_all(r, ".//object")
+  projsets <- obj[which(xml_attr(obj, "class") == "epp2011.core.sets.ProjectionSet")]
+  
+  for(eppSet in projsets){
 
-    eppSet <- r[[eppSetChildren.idx]][[eppSet.idx]][[1]]
-    eppName <- xmlToList(eppSet[[which(xmlSApply(eppSet, xmlAttrs) == "name")]][["string"]])
+    projset_id <- as.integer(gsub("[^0-9]", "", xml_attr(eppSet, "id")))
+    
+    eppSet <- xml_children(eppSet)
+    names(eppSet) <- xml_attr(eppSet, "property")
 
-    pop15to49.idx <- which(xmlSApply(eppSet, xmlAttrs) == "pop15to49")
-    pop15.idx <- which(xmlSApply(eppSet, xmlAttrs) == "pop15")
-    pop50.idx <- which(xmlSApply(eppSet, xmlAttrs) == "pop50")
-    netMigration.idx <- which(xmlSApply(eppSet, xmlAttrs) == "netMigration")
+    eppName <- xml_text(eppSet[["name"]])
 
-    subp <- data.frame(year = workset.startyear:workset.endyear,
-                       pop15to49 = 0,
-                       pop15 = 0,
-                       pop50 = 0,
-                       netmigr = 0)
-    subp$pop15to49[as.integer(xmlSApply(eppSet[[pop15to49.idx]][[1]], xmlAttrs))+1] <- as.numeric(xmlSApply(eppSet[[pop15to49.idx]][[1]], xmlSApply, xmlToList))
-    subp$pop15[as.integer(xmlSApply(eppSet[[pop15.idx]][[1]], xmlAttrs))+1] <- as.numeric(xmlSApply(eppSet[[pop15.idx]][[1]], xmlSApply, xmlToList))
-    subp$pop50[as.integer(xmlSApply(eppSet[[pop50.idx]][[1]], xmlAttrs))+1] <- as.numeric(xmlSApply(eppSet[[pop50.idx]][[1]], xmlSApply, xmlToList))
-    subp$netmigr[as.integer(xmlSApply(eppSet[[netMigration.idx]][[1]], xmlAttrs))+1] <- as.numeric(xmlSApply(eppSet[[netMigration.idx]][[1]], xmlSApply, xmlToList))
-
+    subp <- data.frame(year = startyear:endyear,
+                       pop15to49 = .parse_array(xml_find_first(eppSet[["pop15to49"]], "array")),
+                       pop15     = .parse_array(xml_find_first(eppSet[["pop15"]], "array")),
+                       pop50     = .parse_array(xml_find_first(eppSet[["pop50"]], "array")),
+                       netmigr   = .parse_array(xml_find_first(eppSet[["netMigration"]], "array")))
+    
     epp.pops$subpops[[eppName]] <- subp
-    attr(epp.pops$subpops[[eppName]], "epidemic.start") <- as.integer(xmlToList(eppSet[[which(xmlSApply(eppSet, xmlAttrs) == "priorT0vr")]][[1]]))
+    attr(epp.pops$subpops[[eppName]], "epidemic.start") <- as.integer(xml_double(eppSet[["priorT0vr"]]))
   }
 
   class(epp.pops) <- "eppsubp"
