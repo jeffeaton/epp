@@ -17,3 +17,8 @@
 # epp 0.3.3
 
 - Only read ANC-RT data if used in EPP fit
+
+# epp 0.4.0
+- Update EPP .xml file parsers to use `xml2` package instead of `XML` package. Improved logic and efficiency for parsers.
+- Search XML node trees rather than rely on node position. More robust and code now works to read data from concentrated epidemic structured EPP files
+- Parse subpopulation characteristics and turnover from concentrated epidemic files.

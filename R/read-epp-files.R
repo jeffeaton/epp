@@ -377,6 +377,9 @@ read_epp_subpops <- function(pjnz){
   attr(epp.pops, "country") <- xml_text(r[["worksetCountry"]])
   attr(epp.pops, "country_code") <- xml_integer(r[["countryCode"]])
 
+  epidemicType <- tolower(xml_text(xml_find_first(r[["epidemicType"]], ".//string")))
+  attr(epp.pops, "epidemicType") <- epidemicType
+
   startyear <- xml_integer(r[["worksetStartYear"]])
   endyear <- xml_integer(r[["worksetEndYear"]])
   popbaseyear <- xml_integer(r[["worksetPopBaseYear"]])
@@ -407,10 +410,54 @@ read_epp_subpops <- function(pjnz){
                        pop50     = .parse_array(xml_find_first(eppSet[["pop50"]], "array")),
                        netmigr   = .parse_array(xml_find_first(eppSet[["netMigration"]], "array")))
     
+    attr(subp, "projset_id") <- projset_id
+    attr(subp, "epidemic.start") <- as.integer(xml_double(eppSet[["priorT0vr"]]))
+
+    if(epidemicType == "concentrated"){
+
+      subpop <- .parse_array(xml_find_first(eppSet[["specSubPop"]], "array"))
+      names(subpop) <- c("low_risk", "msm", "msw", "fsw", "clients",
+                         "idu", "prisoners", "transgender", "anc")
+
+      if(length(eppSet[["percentageMale"]]))
+        percent_male <- xml_double(eppSet[["percentageMale"]])/100
+      else
+        percent_male <- 0.0
+                              
+      turnover <- as.logical(length(eppSet[["turnedOver"]])) &&
+        as.logical(xml_text(eppSet[["turnedOver"]]))
+      
+      if(turnover){
+        duration <- xml_double(eppSet[["duration"]])
+        assign_id <- xml_attr(xml_find_first(eppSet[["groupToAssignTo"]], ".//object"), "id")
+        assign_id <- as.integer(gsub("[^0-9]", "", assign_id))
+        assignmentType <- switch(xml_text(xml_find_first(eppSet[["assignmentMethod"]], ".//string")),
+                                 ASSIGN_REPLACE_PREVALENCE = "replace",
+                                 ASSIGN_ADD_PREVALENCE = "add")
+                                 
+      } else {
+        duration <- NA
+        assign_id <- NA
+        assignmentType <- NA
+      }
+
+      attr(subp, "subpop") <-  names(which(subpop))
+      attr(subp, "percent_male") <- percent_male
+      attr(subp, "turnover") <- turnover
+      attr(subp, "duration") <- duration
+      attr(subp, "assign_id") <- assign_id
+      attr(subp, "assignmentType") <- assignmentType
+    }
+
     epp.pops$subpops[[eppName]] <- subp
-    attr(epp.pops$subpops[[eppName]], "epidemic.start") <- as.integer(xml_double(eppSet[["priorT0vr"]]))
   }
 
+  projset_ids <- sapply(epp.pops$subpops, attr, "projset_id")
+  assign_ids <- sapply(epp.pops$subpops, attr, "assign_id")
+  assign_name <- names(projset_ids)[match(assign_ids, projset_ids)]
+                       
+  epp.pops$subpops <- Map("attr<-", epp.pops$subpops, "assign_name", assign_name)
+  
   class(epp.pops) <- "eppsubp"
 
   return(epp.pops)
