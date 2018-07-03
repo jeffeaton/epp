@@ -157,6 +157,11 @@ read_epp_input <- function(pjnz){
 get_eppxml_workset <- function(pjnz){
 
   xmlfile <- grep(".xml", unzip(pjnz, list=TRUE)$Name, value=TRUE)
+  if(!length(xmlfile)){
+    warning(paste0("No EPP .xml file found for ", basename(pjnz)))
+    return(NULL)
+  }
+    
   con <- unz(pjnz, xmlfile)
   epp.xml <- read_xml(con)
   
@@ -241,6 +246,8 @@ get_eppxml_workset <- function(pjnz){
 read_epp_data <- function(pjnz){
 
   r <- get_eppxml_workset(pjnz)
+  if(is.null(r))
+    return(NULL)
   
   country <- xml_text(r[["worksetCountry"]])
   country_code <- xml_integer(r[["countryCode"]])
@@ -267,41 +274,49 @@ read_epp_data <- function(pjnz){
 
     ##  ANC data  ##
 
-    siteNames <- .parse_array(xml_find_first(eppSet[["siteNames"]], "array"))
-    nsites <- length(siteNames)
-
-    ## ANC site used
-    anc.used <- .parse_array(xml_find_first(eppSet[["siteSelected"]], "array"))
-
-    ## ANC prevalence
-    anc.prev <- .parse_matrix(xml_find_first(eppSet[["survData"]], "array"))
-    dimnames(anc.prev) <- list(site=siteNames, year=1985+0:(ncol(anc.prev)-1))
-    anc.prev[anc.prev == -1] <- NA
-    anc.prev <- anc.prev/100
-
-    ## ANC sample sizes
-    anc.n <- .parse_matrix(xml_find_first(eppSet[["survSampleSizes"]], "array"))
-    dimnames(anc.n) <- list(site=siteNames, year=1985+0:(ncol(anc.n)-1))
-    anc.n[anc.n == -1] <- NA
-
-    ## ANC-RT site level
-
-    if(length(eppSet[["dataInputMode"]]) &&
-       length(xml_find_first(eppSet[["dataInputMode"]], ".//string")))
-      input_mode <- xml_text(xml_find_first(eppSet[["dataInputMode"]], ".//string"))
-
-    if(length(eppSet[["PMTCTData"]]) && input_mode == "ANC"){
-
-      ancrtsite.prev <- .parse_matrix(xml_find_first(eppSet[["PMTCTData"]], "array"))
-      dimnames(ancrtsite.prev) <- list(site=siteNames, year=1985+0:(ncol(ancrtsite.prev)-1))
-      ancrtsite.prev[ancrtsite.prev == -1] <- NA
-      ancrtsite.prev <- ancrtsite.prev/100
-
-      ancrtsite.n <- .parse_matrix(xml_find_first(eppSet[["PMTCTSiteSampleSizes"]], "array"))
-      dimnames(ancrtsite.n) <- list(site=siteNames, year=1985+0:(ncol(ancrtsite.n)-1))      
-      ancrtsite.n[ancrtsite.n == -1] <- NA
-
+    if(exists("siteNames", eppSet)) {
+      siteNames <- .parse_array(xml_find_first(eppSet[["siteNames"]], "array"))
+      nsites <- length(siteNames)
+      
+      ## ANC site used
+      anc.used <- .parse_array(xml_find_first(eppSet[["siteSelected"]], "array"))
+      
+      ## ANC prevalence
+      anc.prev <- .parse_matrix(xml_find_first(eppSet[["survData"]], "array"))
+      dimnames(anc.prev) <- list(site=siteNames, year=1985+0:(ncol(anc.prev)-1))
+      anc.prev[anc.prev == -1] <- NA
+      anc.prev <- anc.prev/100
+      
+      ## ANC sample sizes
+      anc.n <- .parse_matrix(xml_find_first(eppSet[["survSampleSizes"]], "array"))
+      dimnames(anc.n) <- list(site=siteNames, year=1985+0:(ncol(anc.n)-1))
+      anc.n[anc.n == -1] <- NA
+      
+      ## ANC-RT site level
+      
+      if(length(eppSet[["dataInputMode"]]) &&
+         length(xml_find_first(eppSet[["dataInputMode"]], ".//string")))
+        input_mode <- xml_text(xml_find_first(eppSet[["dataInputMode"]], ".//string"))
+      
+      if(length(eppSet[["PMTCTData"]]) && input_mode == "ANC"){
+        
+        ancrtsite.prev <- .parse_matrix(xml_find_first(eppSet[["PMTCTData"]], "array"))
+        dimnames(ancrtsite.prev) <- list(site=siteNames, year=1985+0:(ncol(ancrtsite.prev)-1))
+        ancrtsite.prev[ancrtsite.prev == -1] <- NA
+        ancrtsite.prev <- ancrtsite.prev/100
+        
+        ancrtsite.n <- .parse_matrix(xml_find_first(eppSet[["PMTCTSiteSampleSizes"]], "array"))
+        dimnames(ancrtsite.n) <- list(site=siteNames, year=1985+0:(ncol(ancrtsite.n)-1))      
+        ancrtsite.n[ancrtsite.n == -1] <- NA
+        
+      } else {
+        ancrtsite.prev <- NULL
+        ancrtsite.n <- NULL
+      }
     } else {
+      anc.used <- NULL
+      anc.prev <- NULL
+      anc.n <- NULL
       ancrtsite.prev <- NULL
       ancrtsite.n <- NULL
     }
