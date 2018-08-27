@@ -10,3 +10,5 @@ LazyData: true
 Imports: mvtnorm,
     anclik (>= 0.3),
     xml2
+Remotes:
+    jeffeaton/anclik/anclik
