@@ -340,16 +340,19 @@ read_epp_data <- function(pjnz){
       ancrtcens <- NULL
     }
 
-
     ##  HH surveys  ##
-
     hhs <- data.frame(year = .parse_array(xml_find_first(eppSet[["surveyYears"]], "array")),
                       prev = .parse_array(xml_find_first(eppSet[["surveyHIV"]], "array"))/100,
                       se = .parse_array(xml_find_first(eppSet[["surveyStandardError"]], "array"))/100,
                       n = NA,
-                      used = .parse_array(xml_find_first(eppSet[["surveyIsUsed"]], "array")))
-    
+                      used = .parse_array(xml_find_first(eppSet[["surveyIsUsed"]], "array")),
+                      incid = .parse_array(xml_find_first(eppSet[["inputInc"]], "array")) / 100,
+                      incid_se = .parse_array(xml_find_first(eppSet[["inputIncSE"]], "array")) / 100,
+                      prev_incid_corr = .parse_array(xml_find_first(eppSet[["inputIncPrevCorr"]], "array")),
+                      incid_cohort = .parse_array(xml_find_first(eppSet[["incIsCohort"]], "array")))
+
     hhs <- subset(hhs, prev > 0 | used | se != 0.01)
+    hhs[hhs$incid < 0, c("incid", "incid_se", "prev_incid_corr", "incid_cohort")] <- NA
 
     epp.data[[eppName]] <- list(country=country,
                                 region=eppName,
