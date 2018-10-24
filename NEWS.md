@@ -23,3 +23,7 @@
 - Search XML node trees rather than rely on node position. More robust and code now works to read data from concentrated epidemic structured EPP files
 - Parse subpopulation characteristics and turnover from concentrated epidemic files.
 - Read incidence data inputs.
+
+# epp 0.4.1
+
+- Handle new data structure for household survey data introduced in EPP 2019. *Currently just throws a warning -- to be implemented*
