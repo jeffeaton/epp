@@ -342,17 +342,50 @@ read_epp_data <- function(pjnz){
 
     ##  HH surveys  ##
     if(is.na(match("surveyYears", names(eppSet)))) {
-      warning(paste("File", basename(pjnz), "uses new EPP data structure for HH survey data. Parsers are not yet implemented"))
+      ## warning(paste("File", basename(pjnz), "uses new EPP data structure for HH survey data. Parsers are not yet implemented"))
 
-      hhs <- data.frame(year = integer(),
-                        prev = numeric(),
-                        se = numeric(),
-                        n = numeric(),
-                        used = logical(),
-                        incid = numeric(),
-                        incid_se = numeric(),
-                        prev_incid_corr = numeric(),
-                        incid_cohort = logical())
+      svys <- xml_children(xml_children(eppSet[["surveyData"]]))
+      
+      parse_survey <- function(ns){
+        ns <- xml_children(xml_child(ns))
+        attrs <- lapply(ns, xml_attrs)
+
+        val <- lapply(lapply(ns[sapply(attrs,  "%in%", x = "getField")], xml_children), xml_text)
+
+        v2 <- lapply(ns[!sapply(attrs,  "%in%", x = "getField")], xml_children)
+        v2 <- lapply(v2, lapply, xml_children)
+        v2 <- lapply(v2, lapply, xml_text)
+
+        val <- c(val, unlist(v2, FALSE))
+        val <- setNames(sapply(val, "[", 2), sapply(val, "[", 1))
+
+        cols <- c("name" = "name",
+                  "year" = "year",
+                  "used",
+                  "n",
+                  "surveyHIV" = "prev",
+                  "surveyStandardError" = "se",
+                  "incidence" = "incid",
+                  "standardError" = "incid_se",
+                  "prev_incid_corr",
+                  "incidence_cohort",
+                  "usingIncidenceData" = "incid_used")
+
+        names(val) <- cols[names(val)]
+        val[setdiff(cols, names(val))] <- NA
+        val["used"] <- TRUE
+        val[cols]
+      }
+      
+      hhs <- lapply(svys, parse_survey)
+      hhs <- as.data.frame(do.call(rbind, hhs))
+      hhs <- as.data.frame(lapply(hhs, type.convert))
+
+      hhs$prev <- hhs$prev / 100
+      hhs$se <- hhs$se / 100
+      hhs$incid <- hhs$incid / 100
+      hhs$incid_se <- hhs$incid_se / 100
+
     } else {
       hhs <- data.frame(year = .parse_array(xml_find_first(eppSet[["surveyYears"]], "array")),
                         prev = .parse_array(xml_find_first(eppSet[["surveyHIV"]], "array"))/100,
