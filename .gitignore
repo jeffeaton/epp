@@ -4,3 +4,4 @@
 *.dll
 *.RData
 *.Rhistory
+.Rproj.user
