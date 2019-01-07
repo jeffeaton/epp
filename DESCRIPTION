@@ -12,3 +12,5 @@ Imports: mvtnorm,
     xml2
 Remotes:
     jeffeaton/anclik/anclik
+Suggests: 
+    testthat
