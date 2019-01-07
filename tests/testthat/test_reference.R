@@ -11,9 +11,9 @@ test_that("Botswana2017 EPP data is read correctly", {
   population_ref <- readRDS("reference/Botswana2017_population_data.rds")
   expect_equal(population_data, population_ref)
   
-  spt_data <- epp::read_spt(pjnz)
-  spt_ref <- readRDS("reference/Botswana2017_spt_data.rds")
-  expect_equal(spt_data, spt_ref)
+  incidence_prevalence_bf_data <- epp::read_spt(pjnz)
+  incidence_prevalence_bf_ref <- readRDS("reference/Botswana2017_spt_data.rds")
+  expect_equal(incidence_prevalence_bf_data, incidence_prevalence_bf_ref)
 })
 
 test_that("Botswana2018 EPP data is read correctly", {
@@ -27,9 +27,9 @@ test_that("Botswana2018 EPP data is read correctly", {
   population_ref <- readRDS("reference/Botswana2018_population_data.rds")
   expect_equal(population_data, population_ref)
   
-  spt_data <- epp::read_spt(pjnz)
-  spt_ref <- readRDS("reference/Botswana2018_spt_data.rds")
-  expect_equal(spt_data, spt_ref)
+  incidence_prevalence_bf_data <- epp::read_spt(pjnz)
+  incidence_prevalence_bf_ref <- readRDS("reference/Botswana2018_spt_data.rds")
+  expect_equal(incidence_prevalence_bf_data, incidence_prevalence_bf_ref)
 })
 
 test_that("Mozambique_Maputo_Cidade2018 EPP data is read correctly", {
@@ -46,7 +46,8 @@ test_that("Mozambique_Maputo_Cidade2018 EPP data is read correctly", {
     "reference/Mozambique_Maputo_Cidade2018_population_data.rds")
   expect_equal(population_data, population_ref)
   
-  spt_data <- epp::read_spt(pjnz)
-  spt_ref <- readRDS("reference/Mozambique_Maputo_Cidade2018_spt_data.rds")
-  expect_equal(spt_data, spt_ref)
+  incidence_prevalence_bf_data <- epp::read_spt(pjnz)
+  incidence_prevalence_bf_ref <- readRDS(
+    "reference/Mozambique_Maputo_Cidade2018_spt_data.rds")
+  expect_equal(incidence_prevalence_bf_data, incidence_prevalence_bf_ref)
 })

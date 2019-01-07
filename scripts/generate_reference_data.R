@@ -21,11 +21,11 @@ for (test_case in test_cases) {
                                  "_population_data.rds",
                                  sep = ""))
   
-  spt_data <- read_spt(pjnz_path)
-  saveRDS(spt_data, paste("tests/testthat/reference/", 
-                          test_case,
-                          "_spt_data.rds",
-                          sep = ""))
+  incidence_prevalence_bf <- read_spt(pjnz_path)
+  saveRDS(incidence_prevalence_bf, paste("tests/testthat/reference/", 
+                                   test_case,
+                                   "_incidence_prevalence_bf_data.rds",
+                                   sep = ""))
   
   # spu_data <- read_spu(pjnz_path)
   # saveRDS(spu_data, paste("tests/testthat/reference/", 
