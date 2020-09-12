@@ -341,7 +341,7 @@ read_epp_data <- function(pjnz){
     }
 
     ##  HH surveys  ##
-    if(is.na(match("surveyYears", names(eppSet)))) {
+    if("surveyData" %in% names(eppSet)) {
       ## warning(paste("File", basename(pjnz), "uses new EPP data structure for HH survey data. Parsers are not yet implemented"))
 
       svys <- xml_children(xml_children(eppSet[["surveyData"]]))
@@ -374,6 +374,12 @@ read_epp_data <- function(pjnz){
         names(val) <- cols[names(val)]
         val[setdiff(cols, names(val))] <- NA
         val["used"] <- TRUE
+
+        ## Default constant DEFAULT_SURVEY_YEAR = 2009 used to initialise variable
+        ## in Java EPP code (Robert Puckett; 12 Sep 2020).
+        if(is.na(val[["year"]]))
+          val[["year"]] <- 2009
+        
         val[cols]
       }
       
@@ -386,7 +392,7 @@ read_epp_data <- function(pjnz){
       hhs$incid <- hhs$incid / 100
       hhs$incid_se <- hhs$incid_se / 100
 
-    } else {
+    } else if("surveyYears" %in% names(eppSet)) {
       hhs <- data.frame(year = .parse_array(xml_find_first(eppSet[["surveyYears"]], "array")),
                         prev = .parse_array(xml_find_first(eppSet[["surveyHIV"]], "array"))/100,
                         se = .parse_array(xml_find_first(eppSet[["surveyStandardError"]], "array"))/100,
@@ -408,7 +414,10 @@ read_epp_data <- function(pjnz){
       hhs <- subset(hhs, prev > 0 | used | se != 0.01)
       if(nrow(hhs))
         hhs[hhs$incid < 0, c("incid", "incid_se", "prev_incid_corr", "incid_cohort")] <- NA
+    } else {
+      hhs <- data.frame()
     }
+    
 
     epp.data[[eppName]] <- list(country=country,
                                 region=eppName,

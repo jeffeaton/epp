@@ -1,6 +1,6 @@
 # epp 0.4.1
 
-- Handle new data structure for household survey data introduced in EPP 2019. *Currently just throws a warning -- to be implemented*
+- Handle new data structure for household survey data introduced in EPP 2019.
 
 # epp 0.4.0
 - Update EPP .xml file parsers to use `xml2` package instead of `XML` package. Improved logic and efficiency for parsers.
