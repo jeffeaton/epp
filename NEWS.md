@@ -1,3 +1,6 @@
+# epp 0.4.2
+- Update EPP to read in key populations files
+
 # epp 0.4.1
 
 - Handle new data structure for household survey data introduced in EPP 2019.

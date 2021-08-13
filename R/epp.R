@@ -23,12 +23,16 @@ fnCreateEPPSubpops <- function(epp.input, epp.subpops, epp.data){
     epp.subpop.input[[subpop]] <- epp.input
     epp.subpop.input[[subpop]]$epp.pop <- epp.subpops$subpops[[subpop]]
     epp.subpop.input[[subpop]]$epp.pop$cd4median <- epp.input$epp.pop$cd4median
+    
+    
     epp.subpop.input[[subpop]]$epp.pop$hivp15yr <- epp.input$epp.pop$hivp15yr * art.dist[subpop] # assume distributed same as art.dist (not sure what EPP does)
-
+    epp.subpop.input[[subpop]]$epp.pop$hivp15yr[is.na(epp.subpop.input[[subpop]]$epp.pop$hivp15yr)] <- 0
+    
     epp.art <- epp.input$epp.art
     epp.art$m.val[epp.art$m.isperc == "N"] <- epp.art$m.val[epp.art$m.isperc == "N"] * art.dist[subpop]
     epp.art$f.val[epp.art$f.isperc == "N"] <- epp.art$f.val[epp.art$f.isperc == "N"] * art.dist[subpop]
     epp.art$art15yr <- epp.art$art15yr * art.dist[subpop]
+    epp.art$art15yr[is.na(epp.art$art15yr)] <- 0 
 
     epp.subpop.input[[subpop]]$epp.art <- epp.art
 
