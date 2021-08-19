@@ -7,7 +7,7 @@ fnCreateEPPSubpops <- function(epp.input, epp.subpops, epp.data){
   ## If national survey data are available, apportion ART according to relative average HH survey prevalence in each subpopulation,
   ## If no HH survey, apportion based on relative mean ANC prevalence
   subpop.dist <- prop.table(sapply(epp.subpops$subpops, "[[", "pop15to49")[epp.subpops$total$year == 2010,])  # population distribution in 2010
-  if(nrow(subset(epp.data[[1]]$hhs, used)) != 0){ # HH survey data available
+  if(all(unlist(lapply(epp.data, function(x) nrow(x$hhs)))>0)){ # HH survey data available
     hhsprev.means <- sapply(lapply(epp.data, function(dat) na.omit(dat$hhs$prev[dat$hhs$used])), mean)
     art.dist <- prop.table(subpop.dist * hhsprev.means)
   } else {  ## no HH survey data
@@ -23,22 +23,26 @@ fnCreateEPPSubpops <- function(epp.input, epp.subpops, epp.data){
     epp.subpop.input[[subpop]] <- epp.input
     epp.subpop.input[[subpop]]$epp.pop <- epp.subpops$subpops[[subpop]]
     epp.subpop.input[[subpop]]$epp.pop$cd4median <- epp.input$epp.pop$cd4median
-    
-    
     epp.subpop.input[[subpop]]$epp.pop$hivp15yr <- epp.input$epp.pop$hivp15yr * art.dist[subpop] # assume distributed same as art.dist (not sure what EPP does)
-    epp.subpop.input[[subpop]]$epp.pop$hivp15yr[is.na(epp.subpop.input[[subpop]]$epp.pop$hivp15yr)] <- 0
     
     epp.art <- epp.input$epp.art
     epp.art$m.val[epp.art$m.isperc == "N"] <- epp.art$m.val[epp.art$m.isperc == "N"] * art.dist[subpop]
     epp.art$f.val[epp.art$f.isperc == "N"] <- epp.art$f.val[epp.art$f.isperc == "N"] * art.dist[subpop]
     epp.art$art15yr <- epp.art$art15yr * art.dist[subpop]
-    epp.art$art15yr[is.na(epp.art$art15yr)] <- 0 
 
     epp.subpop.input[[subpop]]$epp.art <- epp.art
 
     if(!is.null(attr(epp.subpops$subpops[[subpop]], "epidemic.start")))
       epp.subpop.input[[subpop]]$epidemic.start <- attr(epp.subpops$subpops[[subpop]], "epidemic.start")
+    
+    epp.subpop.input[[subpop]]$epidemicType <- attr(epp.subpops,"epidemicType")
+    epp.subpop.input[[subpop]]$turnover <-  attr(epp.subpops$subpops[[subpop]],"turnover")
+    epp.subpop.input[[subpop]]$percent_male <-  attr(epp.subpops$subpops[[subpop]],"percent_male")
+    epp.subpop.input[[subpop]]$duration <-  attr(epp.subpops$subpops[[subpop]],"duration")
+  
   }
+  
+
 
   return(epp.subpop.input)
 }
@@ -138,7 +142,21 @@ fnCreateEPPFixPar <- function(epp.input,
     ancadj.dat <- subset(ancadj.db, Code == 10000, paste0("X", 1985:2020))
   }
   ancadjrr <- approx(1985:2020+0.5, ancadj.dat, out.steps, rule=2)$y
+  
+  ################################
+  ##  Turnover-related inputs  ##
+  ##############################
+  turnover <- epp.input$turnover
+    
+  if(turnover){
+    duration <-  epp.input$duration
+    percent_male <-  epp.input$percent_male
+  } else {
+    duration <- NA
+    percent_male <- NA
+  }
 
+  
   val <- list(proj.steps      = proj.steps,
               tsEpidemicStart = tsEpidemicStart,
               dt              = dt,
@@ -157,7 +175,10 @@ fnCreateEPPFixPar <- function(epp.input,
               rvec.spldes     = rvec.spldes,
               iota            = 0.0025,
               ancadj          = ancadj,
-              ancadjrr        = ancadjrr)
+              ancadjrr        = ancadjrr,
+              turnover        = turnover,
+              percent_male    = percent_male,
+              duration        = duration)
 
   class(val) <- "eppfp"
   return(val)
