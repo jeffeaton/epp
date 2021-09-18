@@ -385,7 +385,7 @@ read_epp_data <- function(pjnz){
       
       hhs <- lapply(svys, parse_survey)
       hhs <- as.data.frame(do.call(rbind, hhs))
-      hhs <- as.data.frame(lapply(hhs, type.convert))
+      hhs <- as.data.frame(lapply(hhs, type.convert, as.is = TRUE))
 
       hhs$prev <- hhs$prev / 100
       hhs$se <- hhs$se / 100

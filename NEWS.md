@@ -1,3 +1,7 @@
+# epp 0.4.2
+
+- Add type.convert(..., as.is = TRUE) to silence R 4.1 warning.
+
 # epp 0.4.1
 
 - Handle new data structure for household survey data introduced in EPP 2019.
