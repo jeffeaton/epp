@@ -39,6 +39,9 @@ fnCreateEPPSubpops <- function(epp.input, epp.subpops, epp.data){
     epp.subpop.input[[subpop]]$turnover <-  attr(epp.subpops$subpops[[subpop]],"turnover")
     epp.subpop.input[[subpop]]$percent_male <-  attr(epp.subpops$subpops[[subpop]],"percent_male")
     epp.subpop.input[[subpop]]$duration <-  attr(epp.subpops$subpops[[subpop]],"duration")
+    epp.subpop.input[[subpop]]$assign_id <-  attr(epp.subpops$subpops[[subpop]],"assign_id")
+    epp.subpop.input[[subpop]]$assignmentType <-  attr(epp.subpops$subpops[[subpop]],"assignmentType")
+    epp.subpop.input[[subpop]]$assign_name <-  attr(epp.subpops$subpops[[subpop]],"assign_name")
   
   }
   

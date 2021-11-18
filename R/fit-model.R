@@ -32,13 +32,13 @@ fitmod <- function(obj, ..., B0 = 1e5, B = 1e4, B.re = 3000, number_k = 500, D=0
   likdat <- fnCreateLikDat(eppd, floor(fp$proj.steps[1]))
   
   ## If IMIS fails, start again
-  fit <- try(stop(""), TRUE)
-  while(inherits(fit, "try-error")){
+  #fit <- try(stop(""), TRUE)
+  #while(inherits(fit, "try-error")){
     start.time <- proc.time()
-    fit <- try(IMIS(B0, B, B.re, number_k, D, opt_iter, fp=fp, likdat=likdat,
-                    sample.prior=sample.prior, prior=prior, likelihood=likelihood))
+    fit <- IMIS(B0, B, B.re, number_k, D, opt_iter, fp=fp, likdat=likdat,
+                    sample.prior=sample.prior, prior=prior, likelihood=likelihood)
     fit.time <- proc.time() - start.time
-  }
+  #}
   fit$fp <- fp
   fit$likdat <- likdat
   fit$time <- fit.time

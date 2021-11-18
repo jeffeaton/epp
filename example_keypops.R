@@ -18,7 +18,9 @@ devtools::load_all("~/Documents/epp/")
 ## bw.path <- "~/Documents/Data/Spectrum files/2014, final (downloaded 8 October 2014)/Botswana 2014/Botswana 2014_Nat 19_06_14-c"
 
 bw.path <- "~/Documents/eppasm/inst/extdata/testpjnz/Botswana2018.PJNZ"
+bw.path <- "~/Documents/data/pjnz/senegal_2021_05_04_.pjnz"
 
+debugonce(prepare_epp_fit)
 bw.out <- prepare_epp_fit(bw.path, proj.end=2017.5)
 
 
@@ -31,12 +33,12 @@ theta.rspline <- c(2.16003605, -0.76713859, 0.21682066, 0.03286402, 0.21494412,
                    0.40138627, -0.08235464, -16.32721684, -2.97511957,
                    0.21625028, -4.199)
 
-fp <- attr(bw.out$Urban, "eppfp")
+fp <- attr(bw.out$HSH, "eppfp")
 fp$ancrtsite.beta <- 0
 
 param <- fnCreateParam(theta.rspline, fp)
 fp.rspline <- update(fp, list=param)
-mod.rspline <- epp::simmod.specfp(fp.rspline)
+mod.rspline <- epp::simmod.eppfp(fp.rspline)
 
 
 
