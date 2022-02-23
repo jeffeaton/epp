@@ -12,4 +12,4 @@ Imports:
     anclik (>= 0.3),
     xml2
 Remotes:
-    jeffeaton/anclik/anclik
+    jeffeaton/anclik
