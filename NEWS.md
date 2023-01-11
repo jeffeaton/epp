@@ -1,5 +1,14 @@
-# epp 0.4.2
+# epp 0.4.4
+
 - Update EPP to read in key populations files
+
+# epp 0.4.3
+
+- Add function `read_eppxml_results()` to read projection outputs from EPP .xml file including ART coverage.
+
+# epp 0.4.2
+
+- Add type.convert(..., as.is = TRUE) to silence R 4.1 warning.
 
 # epp 0.4.1
 

@@ -385,7 +385,7 @@ read_epp_data <- function(pjnz){
       
       hhs <- lapply(svys, parse_survey)
       hhs <- as.data.frame(do.call(rbind, hhs))
-      hhs <- as.data.frame(lapply(hhs, type.convert))
+      hhs <- as.data.frame(lapply(hhs, type.convert, as.is = TRUE))
 
       hhs$prev <- hhs$prev / 100
       hhs$se <- hhs$se / 100
@@ -599,6 +599,55 @@ read_spu <- function(pjnz){
 }
 
 
+#' Read Bayesian Median outputs from XML
+#'
+#' @param pjnz
+#'
+
+read_eppxml_results <- function(pjnz) {
+
+  r <- get_eppxml_workset(pjnz)
+  if(is.null(r))
+    return(NULL)
+
+  country <- xml_text(r[["worksetCountry"]])
+  country_code <- xml_integer(r[["countryCode"]])
+  startyear <- xml_integer(r[["worksetStartYear"]])
+  endyear <- xml_integer(r[["worksetEndYear"]])
+
+  years <- startyear:endyear
+  
+  v <- list() # declare list to store output
+
+  obj <- xml_find_all(r, ".//object")
+  projsets <- obj[which(xml_attr(obj, "class") == "epp2011.core.sets.ProjectionSet")]
+
+  for(eppSet in projsets){
+
+    eppSet <- xml_children(eppSet)
+    names(eppSet) <- xml_attr(eppSet, "property")
+
+    eppName <- xml_text(eppSet[["name"]])
+
+    prev <- .parse_array(xml_find_first(eppSet[["bayesMediansPrevTrendNoCal"]], "array"))
+    incid <- .parse_array(xml_find_first(eppSet[["bayesMediansIncidTrendNoCal"]], "array"))
+    artcov <- .parse_array(xml_find_first(eppSet[["bayesMediansARTCoverage"]], "array"))
+
+    v[[eppName]] <- data.frame(country_code = country_code,
+                               country = country,
+                               epp_region = eppName,
+                               year = years,
+                               prevalence = prev,
+                               incidence = incid,
+                               art_coverage = artcov)
+  }
+
+  v <- do.call(rbind, v)
+  rownames(v) <- NULL
+
+  v
+}
+ 
 
 
 ###################
