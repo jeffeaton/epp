@@ -1,3 +1,8 @@
+# epp 0.4.4
+
+- Add function `read_epp_workset_options()` to read ANC prevalence adjustment and EPP-ASM model 
+  option selections in EPP Curve Fitting page.
+  
 # epp 0.4.3
 
 - Add function `read_eppxml_results()` to read projection outputs from EPP .xml file including ART coverage.

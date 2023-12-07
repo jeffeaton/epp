@@ -647,7 +647,57 @@ read_eppxml_results <- function(pjnz) {
 
   v
 }
- 
+
+#' Read EPP Workset Options
+#'
+#' Parse 'Worset option' selections for overall EPP
+#' workset in the "Model options" pop up box in the
+#' Curve Fitting workflow
+#'
+#' @param pjnz file path to Spectrum PJNZ file
+#'
+#' @export
+
+read_epp_workset_options <- function(pjnz) {
+
+  r <- get_eppxml_workset(pjnz)
+
+  if(is.null(r))
+    return()
+  
+  country <- if("worksetCountry" %in% names(r)) {
+    xml_text(r[["worksetCountry"]])
+  } else {
+    NA_character_
+  }
+  
+  country_code <- xml_integer(r[["countryCode"]])
+
+  epidemicType <- tolower(xml_text(xml_find_first(r[["epidemicType"]], ".//string")))
+
+  elig_anc_adj <- "eligibleForANCAdjust" %in% names(r) &&
+    as.logical(xml_text(r[["eligibleForANCAdjust"]]))
+  
+  use_asm <- "fitWithAgeModel" %in% names(r) &&
+    as.logical(xml_text(r[["fitWithAgeModel"]]))
+
+  no_anc_adj <- "noANCAdjust" %in% names(r) &&
+    as.logical(xml_text(r[["noANCAdjust"]]))
+
+  no_var_infl <- "fitWithVarianceInflation" %in% names(r) &&
+    xml_text(r[["fitWithVarianceInflation"]]) == "false"
+
+  data.frame(
+    country = country,
+    country_code = country_code,
+    epidemic_type = epidemicType,
+    elig_anc_adj = elig_anc_adj,
+    use_asm = use_asm,
+    use_anc_adj = !no_anc_adj,
+    use_var_infl = !no_var_infl
+  )
+}
+
 
 
 ###################
