@@ -13,3 +13,5 @@ S3method(prev, epp)
 S3method(incid, epp)
 import(mvtnorm)
 useDynLib(epp, eppC)
+
+import(xml2)
