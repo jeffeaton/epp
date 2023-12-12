@@ -2,6 +2,7 @@
 
 - Add function `read_epp_workset_options()` to read ANC prevalence adjustment and EPP-ASM model 
   option selections in EPP Curve Fitting page.
+- Update `read_epp_data()` to read household survey ART coverage inputs.
   
 # epp 0.4.3
 

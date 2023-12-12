@@ -3,7 +3,7 @@
 ####  Function to read inputs from Spectrum to EPP (.ep1, .ep3, .ep4)  ####
 ###########################################################################
 
-read_epp_input <- function(pjnz){
+read_epp_input <- function(pjnz) {
 
   ## ep1
   ep1file <- grep(".ep1", unzip(pjnz, list=TRUE)$Name, value=TRUE)
@@ -154,10 +154,10 @@ read_epp_input <- function(pjnz){
 #'
 #' @param x `xml_node` object with tag 'array'
 #' @import xml2
-get_eppxml_workset <- function(pjnz){
+get_eppxml_workset <- function(pjnz) {
 
   xmlfile <- grep(".xml", unzip(pjnz, list=TRUE)$Name, value=TRUE)
-  if(!length(xmlfile)){
+  if(!length(xmlfile)) {
     warning(paste0("No EPP .xml file found for ", basename(pjnz)))
     return(NULL)
   }
@@ -175,7 +175,7 @@ get_eppxml_workset <- function(pjnz){
 #'
 #' @param x `xml_node` object with tag 'array'
 #' @import xml2
-.parse_array <- function(x){
+.parse_array <- function(x) {
 
   a_length <- as.integer(xml_attr(x, "length"))
   a_mode <- switch(xml_attr(x, "class"),
@@ -207,7 +207,7 @@ get_eppxml_workset <- function(pjnz){
 #'
 #' @param x `xml_node` object with tag 'array' and type '[D' or '[I'
 #' @import xml2
-.parse_matrix <- function(x){
+.parse_matrix <- function(x) {
 
   if(!xml_attr(x, "class") %in% c("[D", "[I"))
     stop("Tried to invoke .parse_matrix() on array node not of class '[D' or '[I]'.")
@@ -242,12 +242,15 @@ get_eppxml_workset <- function(pjnz){
 #' "epp2011.core.sets.ProjectionSet".
 #'
 #' @import xml2
+#' 
 #' @export
-read_epp_data <- function(pjnz){
+read_epp_data <- function(pjnz) {
 
   r <- get_eppxml_workset(pjnz)
-  if(is.null(r))
+  
+  if(is.null(r)) {
     return(NULL)
+  }
 
   country <- xml_text(r[["worksetCountry"]])
   country_code <- xml_integer(r[["countryCode"]])
@@ -263,7 +266,7 @@ read_epp_data <- function(pjnz){
   obj <- xml_find_all(r, ".//object")
   projsets <- obj[which(xml_attr(obj, "class") == "epp2011.core.sets.ProjectionSet")]
 
-  for(eppSet in projsets){
+  for(eppSet in projsets) {
 
     projset_id <- as.integer(gsub("[^0-9]", "", xml_attr(eppSet, "id")))
 
@@ -295,10 +298,11 @@ read_epp_data <- function(pjnz){
       ## ANC-RT site level
 
       if(length(eppSet[["dataInputMode"]]) &&
-         length(xml_find_first(eppSet[["dataInputMode"]], ".//string")))
+         length(xml_find_first(eppSet[["dataInputMode"]], ".//string"))) {
         input_mode <- xml_text(xml_find_first(eppSet[["dataInputMode"]], ".//string"))
+      }
 
-      if(length(eppSet[["PMTCTData"]]) && input_mode == "ANC"){
+      if(length(eppSet[["PMTCTData"]]) && input_mode == "ANC") {
 
         ancrtsite.prev <- .parse_matrix(xml_find_first(eppSet[["PMTCTData"]], "array"))
         dimnames(ancrtsite.prev) <- list(site=siteNames, year=1985+0:(ncol(ancrtsite.prev)-1))
@@ -321,9 +325,8 @@ read_epp_data <- function(pjnz){
       ancrtsite.n <- NULL
     }
 
-
     ## ANC-RT census level
-    if(length(eppSet[["censusPMTCTSurvData"]]) && input_mode == "ANC"){
+    if(length(eppSet[["censusPMTCTSurvData"]]) && input_mode == "ANC") {
 
       ancrtcens.prev <- .parse_array(xml_find_first(eppSet[["censusPMTCTSurvData"]], "array"))
       names(ancrtcens.prev) <- 1985+0:(length(ancrtcens.prev)-1)
@@ -346,7 +349,7 @@ read_epp_data <- function(pjnz){
 
       svys <- xml_children(xml_children(eppSet[["surveyData"]]))
       
-      parse_survey <- function(ns){
+      parse_survey <- function(ns) {
         ns <- xml_children(xml_child(ns))
         attrs <- lapply(ns, xml_attrs)
 
@@ -369,7 +372,10 @@ read_epp_data <- function(pjnz){
                   "standardError" = "incid_se",
                   "prev_incid_corr",
                   "incidence_cohort",
-                  "usingIncidenceData" = "incid_used")
+                  "usingIncidenceData" = "incid_used",
+                  "pct15to49ART" = "art_coverage",
+                  "pct15to49ARTSE" = "art_coverage_se",
+                  "usingARTData" = "art_coverage_used")
 
         names(val) <- cols[names(val)]
         val[setdiff(cols, names(val))] <- NA
@@ -391,6 +397,10 @@ read_epp_data <- function(pjnz){
       hhs$se <- hhs$se / 100
       hhs$incid <- hhs$incid / 100
       hhs$incid_se <- hhs$incid_se / 100
+      hhs$incid_used <- as.logical(hhs$incid_used)      
+      hhs$art_coverage <- hhs$art_coverage / 100
+      hhs$art_coverage_se <- hhs$art_coverage_se / 100
+      hhs$art_coverage_used <- as.logical(hhs$art_coverage_used)
 
     } else if("surveyYears" %in% names(eppSet)) {
       hhs <- data.frame(year = .parse_array(xml_find_first(eppSet[["surveyYears"]], "array")),
@@ -399,7 +409,7 @@ read_epp_data <- function(pjnz){
                         n = NA,
                         used = .parse_array(xml_find_first(eppSet[["surveyIsUsed"]], "array")))
 
-      if(!is.null(eppSet[["inputInc"]])){
+      if(!is.null(eppSet[["inputInc"]])) {
         hhs$incid <- .parse_array(xml_find_first(eppSet[["inputInc"]], "array")) / 100
         hhs$incid_se <- .parse_array(xml_find_first(eppSet[["inputIncSE"]], "array")) / 100
         hhs$prev_incid_corr <- .parse_array(xml_find_first(eppSet[["inputIncPrevCorr"]], "array"))
@@ -417,7 +427,6 @@ read_epp_data <- function(pjnz){
     } else {
       hhs <- data.frame()
     }
-    
 
     epp.data[[eppName]] <- list(country=country,
                                 region=eppName,
@@ -452,7 +461,7 @@ read_epp_data <- function(pjnz){
 #' @import xml2
 #' @export
 
-read_epp_subpops <- function(pjnz){
+read_epp_subpops <- function(pjnz) {
 
   r <- get_eppxml_workset(pjnz)
 
@@ -496,7 +505,7 @@ read_epp_subpops <- function(pjnz){
     attr(subp, "projset_id") <- projset_id
     attr(subp, "epidemic.start") <- as.integer(xml_double(eppSet[["priorT0vr"]]))
 
-    if(epidemicType == "concentrated"){
+    if(epidemicType == "concentrated") {
 
       subpop <- .parse_array(xml_find_first(eppSet[["specSubPop"]], "array"))
       names(subpop) <- c("low_risk", "msm", "msw", "fsw", "clients",
@@ -510,14 +519,13 @@ read_epp_subpops <- function(pjnz){
       turnover <- as.logical(length(eppSet[["turnedOver"]])) &&
         as.logical(xml_text(eppSet[["turnedOver"]]))
 
-      if(turnover){
+      if(turnover) {
         duration <- xml_double(eppSet[["duration"]])
         assign_id <- xml_attr(xml_find_first(eppSet[["groupToAssignTo"]], ".//object"), "id")
         assign_id <- as.integer(gsub("[^0-9]", "", assign_id))
         assignmentType <- switch(xml_text(xml_find_first(eppSet[["assignmentMethod"]], ".//string")),
                                  ASSIGN_REPLACE_PREVALENCE = "replace",
                                  ASSIGN_ADD_PREVALENCE = "add")
-
       } else {
         duration <- NA
         assign_id <- NA
@@ -551,7 +559,7 @@ read_epp_subpops <- function(pjnz){
 ####  Read EPP prevalence and incidence outputs  ####
 #####################################################
 
-read_spt <- function(pjnz){
+read_spt <- function(pjnz) {
 
   sptfile <- grep("\\.SPT$", unzip(pjnz, list=TRUE)$Name, value=TRUE)
   con <- unz(pjnz, sptfile)
@@ -565,7 +573,7 @@ read_spt <- function(pjnz){
   regions[is.na(regions)] <- "National"
 
   out <- lapply(sub.break.rows[-1],
-                function(idx){
+                function(idx) {
                   dat <- spt[idx-n.years:1]
                   mat <- data.frame(t(sapply(strsplit(dat, ","), as.numeric)), row.names=1)
                   mat[,1:2] <- mat[,1:2]/100
@@ -577,7 +585,7 @@ read_spt <- function(pjnz){
   return(out)
 }
 
-read_spu <- function(pjnz){
+read_spu <- function(pjnz) {
 
   spufile <- grep("\\.SPU$", unzip(pjnz, list=TRUE)$Name, value=TRUE)
   spu <- read.csv(unz(pjnz, spufile), header=FALSE)
